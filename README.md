@@ -45,7 +45,9 @@ Source files: [docs/erd.mmd](docs/erd.mmd) (Mermaid) and [docs/erd.dbml](docs/er
 
 ## How to Get It Running
 
-You need [Node.js](https://nodejs.org) 18 or newer and [Git](https://git-scm.com).
+**Just want to use it?** The live site is at https://reece-bunnage.github.io/IS-Connect/. No install needed.
+
+To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or newer and [Git](https://git-scm.com).
 
 1. **Get the code**
    ```bash
@@ -55,8 +57,10 @@ You need [Node.js](https://nodejs.org) 18 or newer and [Git](https://git-scm.com
    ```
 2. **Set up the database** (skip if you are using the team's existing Supabase project)
    1. Create a free project at [supabase.com](https://supabase.com).
-   2. In the project, open **SQL Editor → New query**, paste in all of [supabase/schema.sql](supabase/schema.sql), and click **Run**. This creates the 9 tables and their access policies.
-   3. Open a new query, paste in [supabase/seed.sql](supabase/seed.sql), and click **Run**. This adds sample rows to every table.
+   2. Do step 3 below first, then add one more line to `.env.local`: `SUPABASE_DB_URL=` followed by the URI from **Connect → Session pooler**, with your database password in place of `[YOUR-PASSWORD]`.
+   3. Run `npm run db:setup`. This creates the 9 tables and their access policies and adds sample rows. It refuses to run if the tables already exist; `npm run db:setup -- --reset` wipes **all data** and rebuilds.
+
+   (No terminal? Paste [supabase/schema.sql](supabase/schema.sql) and then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each.)
 3. **Add your keys**
    1. In Supabase, click **Connect** (or go to **Project Settings → API**) and copy the **Project URL** and the **publishable / anon** key. Never use the `service_role` / secret key.
    2. Copy `.env.example` to a new file named `.env.local`, and paste in the two values:
@@ -69,6 +73,14 @@ You need [Node.js](https://nodejs.org) 18 or newer and [Git](https://git-scm.com
    npm run dev
    ```
    Open the `http://localhost:5173` link that it prints.
+
+### Deploying
+
+Every push to `main` rebuilds the live site through [.github/workflows/deploy.yml](.github/workflows/deploy.yml). One-time setup on GitHub:
+
+1. **Settings → Secrets and variables → Actions → New repository secret**: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (same values as `.env.local`).
+2. **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions**.
+3. **Actions → Deploy to GitHub Pages → Run workflow** (or just push to `main`).
 
 ## Verifying the Vertical Slice
 
