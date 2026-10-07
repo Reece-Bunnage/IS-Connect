@@ -1,0 +1,75 @@
+// IS-Connect ERD -- paste into https://dbdiagram.io to view or edit.
+
+Table students {
+  id uuid [pk]
+  full_name text [not null]
+  avatar_url text
+  program_status text [not null, note: 'pre_is or is_core']
+  current_course text [note: 'e.g. IS 201']
+  looking_for_help_with text
+  bio text
+  created_at timestamptz
+}
+
+Table skills {
+  id bigint [pk]
+  name text [unique, not null]
+}
+
+Table student_skills {
+  student_id uuid [pk, ref: > students.id]
+  skill_id bigint [pk, ref: > skills.id]
+  Note: 'Join table: students <> skills is many-to-many'
+}
+
+Table friendships {
+  id bigint [pk]
+  requester_id uuid [ref: > students.id]
+  addressee_id uuid [ref: > students.id]
+  status text [note: 'pending or accepted']
+  created_at timestamptz
+}
+
+Table messages {
+  id bigint [pk]
+  sender_id uuid [ref: > students.id]
+  recipient_id uuid [ref: > students.id]
+  body text
+  sent_at timestamptz
+}
+
+Table availability_slots {
+  id bigint [pk]
+  student_id uuid [ref: > students.id]
+  day_of_week text
+  start_time time
+  duration_minutes int
+}
+
+Table meetups {
+  id bigint [pk]
+  requester_id uuid [ref: > students.id]
+  partner_id uuid [ref: > students.id]
+  scheduled_at timestamptz
+  location text
+  status text [note: 'requested, confirmed, completed, cancelled']
+  created_at timestamptz
+}
+
+Table study_resources {
+  id bigint [pk]
+  uploader_id uuid [ref: > students.id]
+  title text
+  course text
+  resource_url text
+  uploaded_at timestamptz
+}
+
+Table user_blocks {
+  id bigint [pk]
+  blocker_id uuid [ref: > students.id]
+  blocked_id uuid [ref: > students.id]
+  is_report boolean
+  reason text
+  created_at timestamptz
+}

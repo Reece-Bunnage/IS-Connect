@@ -1,0 +1,81 @@
+---
+title: IS-Connect ERD
+---
+erDiagram
+    students ||--o{ student_skills : "M:N with skills (1-to-many): has strength"
+    skills ||--o{ student_skills : "M:N with students (1-to-many): held by"
+    students ||--o{ friendships : "1-to-many: sends request"
+    students ||--o{ friendships : "1-to-many: receives request"
+    students ||--o{ messages : "1-to-many: sends"
+    students ||--o{ messages : "1-to-many: receives"
+    students ||--o{ availability_slots : "1-to-many: is free during"
+    students ||--o{ meetups : "1-to-many: requests"
+    students ||--o{ meetups : "1-to-many: is partner in"
+    students ||--o{ study_resources : "1-to-many: uploads"
+    students ||--o{ user_blocks : "1-to-many: blocks / reports"
+    students ||--o{ user_blocks : "1-to-many: is blocked"
+
+    students {
+        uuid id PK
+        text full_name
+        text avatar_url
+        text program_status "pre_is or is_core"
+        text current_course "e.g. IS 201"
+        text looking_for_help_with
+        text bio
+        timestamptz created_at
+    }
+    skills {
+        bigint id PK
+        text name UK "Python, SQL, Excel..."
+    }
+    student_skills {
+        uuid student_id PK, FK
+        bigint skill_id PK, FK
+    }
+    friendships {
+        bigint id PK
+        uuid requester_id FK
+        uuid addressee_id FK
+        text status "pending or accepted"
+        timestamptz created_at
+    }
+    messages {
+        bigint id PK
+        uuid sender_id FK
+        uuid recipient_id FK
+        text body
+        timestamptz sent_at
+    }
+    availability_slots {
+        bigint id PK
+        uuid student_id FK
+        text day_of_week
+        time start_time
+        int duration_minutes
+    }
+    meetups {
+        bigint id PK
+        uuid requester_id FK
+        uuid partner_id FK
+        timestamptz scheduled_at
+        text location
+        text status "requested, confirmed, completed, cancelled"
+        timestamptz created_at
+    }
+    study_resources {
+        bigint id PK
+        uuid uploader_id FK
+        text title
+        text course
+        text resource_url
+        timestamptz uploaded_at
+    }
+    user_blocks {
+        bigint id PK
+        uuid blocker_id FK
+        uuid blocked_id FK
+        boolean is_report
+        text reason
+        timestamptz created_at
+    }
