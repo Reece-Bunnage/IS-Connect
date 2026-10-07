@@ -27,6 +27,8 @@ button { font: inherit; cursor: pointer; }
 .brand { display: flex; align-items: center; gap: 8px; border: 0; background: none; font-weight: 700; font-size: 1.1rem; color: var(--text); padding: 0; }
 .logo { background: var(--green); color: #fff; border-radius: 8px; padding: 4px 7px; font-size: 0.85rem; }
 .link { border: 0; background: none; color: var(--green); font-weight: 600; }
+.account { align-items: center; justify-content: flex-end; gap: 12px; }
+.account .muted { overflow: hidden; text-overflow: ellipsis; max-width: 40vw; white-space: nowrap; }
 
 .hero { background: var(--green-soft); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
 .eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: var(--green); font-weight: 700; }
@@ -49,7 +51,7 @@ button { font: inherit; cursor: pointer; }
 
 .form { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
 .form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.92rem; }
-.form input:not([type]), .form input[type='text'], select {
+.form input:not([type]), .form input[type='text'], .form input[type='email'], .form input[type='password'], select {
   font: inherit; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: var(--text);
 }
 fieldset { border: 0; padding: 0; margin: 0; }

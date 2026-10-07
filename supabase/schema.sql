@@ -16,6 +16,7 @@ drop table if exists students cascade;
 -- A person using the app (Make Account / Find Friends screens)
 create table students (
   id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid unique default auth.uid() references auth.users(id) on delete cascade, -- login that owns this profile (null for sample students)
   full_name             text not null,
   avatar_url            text,
   program_status        text not null check (program_status in ('pre_is', 'is_core')),
@@ -101,8 +102,8 @@ create table user_blocks (
 );
 
 -- Row Level Security
--- The prototype has no login yet, so the public (anon) key may read every
--- table, but may only INSERT into the tables used by the Create Profile button.
+-- Anyone may read every table. Only a logged-in user may create or edit
+-- their own profile (students.user_id = auth.uid()) and its strengths.
 alter table students           enable row level security;
 alter table skills             enable row level security;
 alter table student_skills     enable row level security;
@@ -123,5 +124,10 @@ create policy "Public read" on meetups            for select to anon, authentica
 create policy "Public read" on study_resources    for select to anon, authenticated using (true);
 create policy "Public read" on user_blocks        for select to anon, authenticated using (true);
 
-create policy "Create profile" on students       for insert to anon, authenticated with check (true);
-create policy "Create profile" on student_skills for insert to anon, authenticated with check (true);
+create policy "Create own profile" on students for insert to authenticated with check (user_id = auth.uid());
+create policy "Edit own profile"   on students for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "Add own skills" on student_skills for insert to authenticated
+  with check (student_id in (select id from students where user_id = auth.uid()));
+create policy "Remove own skills" on student_skills for delete to authenticated
+  using (student_id in (select id from students where user_id = auth.uid()));
