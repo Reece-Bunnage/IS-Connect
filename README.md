@@ -55,19 +55,32 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
    cd IS-Connect
    npm install
    ```
-2. **Set up the database** (skip if you are using the team's existing Supabase project)
-   1. Create a free project at [supabase.com](https://supabase.com).
-   2. Do step 3 below first, then add one more line to `.env.local`: `SUPABASE_DB_URL=` followed by the URI from **Connect → Session pooler**, with your database password in place of `[YOUR-PASSWORD]`.
-   3. Run `npm run db:setup`. This creates the 9 tables and their access policies and adds sample rows. It refuses to run if the tables already exist; `npm run db:setup -- --reset` wipes **all data** and rebuilds.
-
-   (No terminal? Paste [supabase/schema.sql](supabase/schema.sql) and then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each.)
-3. **Add your keys**
+2. **Add your keys**
    1. In Supabase, click **Connect** (or go to **Project Settings → API**) and copy the **Project URL** and the **publishable / anon** key. Never use the `service_role` / secret key.
-   2. Copy `.env.example` to a new file named `.env.local`, and paste in the two values:
+   2. Copy `.env.example` to a new file named `.env.local` and paste in the two values:
       ```
       VITE_SUPABASE_URL=https://your-project-ref.supabase.co
       VITE_SUPABASE_ANON_KEY=sb_publishable_...
       ```
+   `.env.local` stays on your computer (it's in `.gitignore`). Never put real values in `.env.example`, because that file is public on GitHub.
+3. **Set up the database** (skip if you are using the team's existing Supabase project, which is already set up)
+   1. Create a free project at [supabase.com](https://supabase.com) and note its **database password**. If you've lost it, use **Project Settings → Database → Reset database password**, and pick one with only letters and numbers.
+   2. In Supabase, click **Connect → Session pooler** and copy the connection string. Add it to `.env.local` as one more line, with your password in place of `[YOUR-PASSWORD]` (remove the brackets too):
+      ```
+      SUPABASE_DB_URL=postgresql://postgres.your-project-ref:yourpassword@aws-1-us-west-2.pooler.supabase.com:5432/postgres
+      ```
+      Copy the string from **Connect** rather than typing it, because the project ID and server address (`aws-0`/`aws-1`, region) differ per project.
+   3. Run the command that matches your database:
+
+      | Your database | Command | What happens to existing data |
+      |---|---|---|
+      | Brand new, no tables yet | `npm run db:setup` | Nothing to lose. Creates all tables, login functions and sample data. |
+      | Has tables you want to keep profiles from (e.g. made by hand in the Table Editor) | `node --env-file=.env.local scripts/rebuild-keep-profiles.js` | Keeps every row in `students`, rebuilds everything else. If anything fails, nothing changes. |
+      | Start completely over | `npm run db:setup -- --reset` | **Deletes all data**, including logins, then rebuilds with sample data. |
+
+   (No terminal? Paste [supabase/schema.sql](supabase/schema.sql) and then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. This also deletes existing data.)
+
+   Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has `app_users`, `app_sessions`, `students`, `skills`, `student_skills`, `friendships`, `messages`, `availability_slots`, `meetups`, `study_resources` and `user_blocks`.
 4. **Start the app**
    ```bash
    npm run dev

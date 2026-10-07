@@ -21,7 +21,7 @@ try {
   // schema.sql drops every table, so don't silently wipe real user data.
   const { rows } = await client.query("select to_regclass('public.students') is not null as exists")
   if (rows[0].exists && !reset) {
-    console.error('Tables already exist. Re-run with --reset to wipe ALL data and rebuild.')
+    console.error('Tables already exist. Use scripts/rebuild-keep-profiles.js to keep profiles, or --reset to wipe ALL data.')
     process.exit(1)
   }
 
