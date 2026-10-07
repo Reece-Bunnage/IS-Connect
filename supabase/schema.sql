@@ -1,5 +1,5 @@
 -- IS-Connect database schema
--- Run in Supabase Dashboard -> SQL Editor, then run seed.sql.
+-- Run with `npm run db:setup` (or paste into Supabase SQL Editor, then run seed.sql).
 -- Re-running this file drops and recreates every table (all data is lost).
 
 drop table if exists items cascade;              -- old connection-test table
@@ -12,11 +12,30 @@ drop table if exists friendships cascade;
 drop table if exists student_skills cascade;
 drop table if exists skills cascade;
 drop table if exists students cascade;
+drop table if exists app_sessions cascade;
+drop table if exists app_users cascade;
+
+create extension if not exists pgcrypto with schema extensions;  -- password hashing
+
+-- Login: a username + hashed password (never readable through the API)
+create table app_users (
+  id            uuid primary key default gen_random_uuid(),
+  username      text not null unique check (username ~ '^[a-z0-9_.]{3,30}$'),
+  password_hash text not null,
+  created_at    timestamptz not null default now()
+);
+
+-- A logged-in browser. The app keeps the token so a refresh stays logged in.
+create table app_sessions (
+  token      uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references app_users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
 
 -- A person using the app (Make Account / Find Friends screens)
 create table students (
   id                    uuid primary key default gen_random_uuid(),
-  user_id               uuid unique default auth.uid() references auth.users(id) on delete cascade, -- login that owns this profile (null for sample students)
+  user_id               uuid unique references app_users(id) on delete cascade, -- login that owns this profile (null for sample students)
   full_name             text not null,
   avatar_url            text,
   program_status        text not null check (program_status in ('pre_is', 'is_core')),
@@ -102,8 +121,10 @@ create table user_blocks (
 );
 
 -- Row Level Security
--- Anyone may read every table. Only a logged-in user may create or edit
--- their own profile (students.user_id = auth.uid()) and its strengths.
+-- Anyone may read the app tables. Logins and sessions are not readable at all,
+-- and profiles can only be written through the functions below.
+alter table app_users          enable row level security;
+alter table app_sessions       enable row level security;
 alter table students           enable row level security;
 alter table skills             enable row level security;
 alter table student_skills     enable row level security;
@@ -124,10 +145,91 @@ create policy "Public read" on meetups            for select to anon, authentica
 create policy "Public read" on study_resources    for select to anon, authenticated using (true);
 create policy "Public read" on user_blocks        for select to anon, authenticated using (true);
 
-create policy "Create own profile" on students for insert to authenticated with check (user_id = auth.uid());
-create policy "Edit own profile"   on students for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- Login functions. They run as the table owner (security definer), so they
+-- can check passwords and write profiles that the public key cannot touch.
 
-create policy "Add own skills" on student_skills for insert to authenticated
-  with check (student_id in (select id from students where user_id = auth.uid()));
-create policy "Remove own skills" on student_skills for delete to authenticated
-  using (student_id in (select id from students where user_id = auth.uid()));
+create or replace function _session_user(p_token uuid) returns uuid
+language sql stable security definer set search_path = public as $$
+  select user_id from app_sessions where token = p_token
+$$;
+revoke execute on function _session_user(uuid) from public, anon, authenticated;
+
+create or replace function sign_up(p_username text, p_password text) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_username text := lower(trim(p_username));
+  v_user_id  uuid;
+  v_token    uuid;
+begin
+  if v_username !~ '^[a-z0-9_.]{3,30}$' then
+    raise exception 'Username must be 3-30 letters, numbers, dots or underscores.';
+  end if;
+  if length(coalesce(p_password, '')) < 6 then
+    raise exception 'Password must be at least 6 characters.';
+  end if;
+  if exists (select 1 from app_users where username = v_username) then
+    raise exception 'That username is taken.';
+  end if;
+  insert into app_users (username, password_hash)
+    values (v_username, crypt(p_password, gen_salt('bf'))) returning id into v_user_id;
+  insert into app_sessions (user_id) values (v_user_id) returning token into v_token;
+  return json_build_object('token', v_token, 'user_id', v_user_id, 'username', v_username);
+end $$;
+
+create or replace function log_in(p_username text, p_password text) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_user  app_users;
+  v_token uuid;
+begin
+  select * into v_user from app_users where username = lower(trim(p_username));
+  if v_user.id is null or v_user.password_hash <> crypt(p_password, v_user.password_hash) then
+    raise exception 'Wrong username or password.';
+  end if;
+  insert into app_sessions (user_id) values (v_user.id) returning token into v_token;
+  return json_build_object('token', v_token, 'user_id', v_user.id, 'username', v_user.username);
+end $$;
+
+-- Who is logged in with this token? (null if the token is unknown)
+create or replace function get_session(p_token uuid) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('token', s.token, 'user_id', u.id, 'username', u.username)
+  from app_sessions s join app_users u on u.id = s.user_id
+  where s.token = p_token
+$$;
+
+create or replace function log_out(p_token uuid) returns void
+language sql security definer set search_path = public as $$
+  delete from app_sessions where token = p_token
+$$;
+
+-- Create or update your own profile and replace your strengths.
+create or replace function save_profile(
+  p_token uuid, p_full_name text, p_program_status text,
+  p_current_course text, p_looking_for_help_with text, p_skill_ids bigint[]
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id    uuid := _session_user(p_token);
+  v_student_id uuid;
+begin
+  if v_user_id is null then
+    raise exception 'Your login has expired. Please log in again.';
+  end if;
+  insert into students (user_id, full_name, program_status, current_course, looking_for_help_with)
+    values (v_user_id, p_full_name, p_program_status, p_current_course, p_looking_for_help_with)
+  on conflict (user_id) do update set
+    full_name = excluded.full_name,
+    program_status = excluded.program_status,
+    current_course = excluded.current_course,
+    looking_for_help_with = excluded.looking_for_help_with
+  returning id into v_student_id;
+
+  delete from student_skills where student_id = v_student_id;
+  insert into student_skills (student_id, skill_id)
+    select v_student_id, unnest(coalesce(p_skill_ids, '{}'));
+  return v_student_id;
+end $$;
+
+grant execute on function sign_up(text, text), log_in(text, text), get_session(uuid),
+  log_out(uuid), save_profile(uuid, text, text, text, text, bigint[]) to anon, authenticated;

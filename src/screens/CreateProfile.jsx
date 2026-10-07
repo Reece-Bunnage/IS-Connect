@@ -12,7 +12,7 @@ function formFrom(profile) {
 
 // Vertical slice: this form INSERTs (or UPDATEs) your row in `students` and
 // your strengths in `student_skills`, then shows the saved profile.
-export default function CreateProfile({ go, profile, onSaved }) {
+export default function CreateProfile({ go, profile, token, onSaved }) {
   const [skills, setSkills] = useState([])
   const [form, setForm] = useState(() => formFrom(profile))
   const [skillIds, setSkillIds] = useState(() => profile?.student_skills.map((ss) => ss.skill_id) ?? [])
@@ -47,17 +47,16 @@ export default function CreateProfile({ go, profile, onSaved }) {
     setSaving(true)
     setError(null)
 
-    const fields = {
-      full_name: form.full_name.trim(),
-      program_status: form.program_status,
-      current_course: form.current_course.trim() || null,
-      looking_for_help_with: form.looking_for_help_with.trim() || null,
-    }
-
-    // 1-2. Send the request; Supabase saves the row (user_id = your login) and returns it.
-    const { data: student, error: saveError } = profile
-      ? await supabase.from('students').update(fields).eq('id', profile.id).select().single()
-      : await supabase.from('students').insert(fields).select().single()
+    // 1-2. Send the request; the save_profile function checks your login,
+    // saves your row in `students` and replaces your strengths.
+    const { error: saveError } = await supabase.rpc('save_profile', {
+      p_token: token,
+      p_full_name: form.full_name.trim(),
+      p_program_status: form.program_status,
+      p_current_course: form.current_course.trim() || null,
+      p_looking_for_help_with: form.looking_for_help_with.trim() || null,
+      p_skill_ids: skillIds,
+    })
 
     if (saveError) {
       setError(saveError.message)
@@ -65,19 +64,10 @@ export default function CreateProfile({ go, profile, onSaved }) {
       return
     }
 
-    // Replace your strengths with the current selection.
-    let { error: skillsError } = await supabase.from('student_skills').delete().eq('student_id', student.id)
-    if (!skillsError && skillIds.length > 0) {
-      ;({ error: skillsError } = await supabase
-        .from('student_skills')
-        .insert(skillIds.map((skill_id) => ({ student_id: student.id, skill_id }))))
-    }
-
     // 3-4. Re-read the profile from the database and show it.
     await onSaved()
     setSaving(false)
-    if (skillsError) setError(`Profile saved, but strengths failed: ${skillsError.message}`)
-    else go('myProfile')
+    go('myProfile')
   }
 
   return (

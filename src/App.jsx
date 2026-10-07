@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
+import { logOut as endSession, restoreSession } from './auth.js'
 import Login from './screens/Login.jsx'
 import Home from './screens/Home.jsx'
 import CreateProfile from './screens/CreateProfile.jsx'
@@ -26,13 +27,14 @@ export default function App() {
   const [profile, setProfile] = useState(undefined) // undefined = loading, null = none yet
   const [profileError, setProfileError] = useState(null)
 
+  // Pick up the login this browser saved, if it's still valid.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
-    return () => data.subscription.unsubscribe()
+    restoreSession()
+      .then(setSession)
+      .catch(() => setSession(null))
   }, [])
 
-  const userId = session?.user.id
+  const userId = session?.user_id
 
   // Your own row in `students`, read fresh from the database.
   const reloadProfile = useCallback(async () => {
@@ -65,13 +67,14 @@ export default function App() {
   }
 
   async function logOut() {
-    await supabase.auth.signOut()
+    await endSession()
+    setSession(null)
     go('home')
   }
 
   const screens = {
     home: <Home go={go} profile={profile} />,
-    createProfile: <CreateProfile go={go} profile={profile} onSaved={reloadProfile} />,
+    createProfile: <CreateProfile go={go} profile={profile} token={session?.token} onSaved={reloadProfile} />,
     myProfile: <MyProfile go={go} profile={profile} />,
     findFriends: <FindFriends />,
     messages: <Messages />,
@@ -83,7 +86,7 @@ export default function App() {
 
   let content
   if (session === undefined) content = <p className="muted">Loading…</p>
-  else if (!session) content = <Login />
+  else if (!session) content = <Login onLogin={setSession} />
   else if (profileError) content = <p className="error">Could not load your profile: {profileError}</p>
   else if (profile === undefined) content = <p className="muted">Loading your profile…</p>
   else content = screens[screen] ?? screens.home
@@ -101,7 +104,7 @@ export default function App() {
                 ← Home
               </button>
             )}
-            <span className="muted">{session.user.email}</span>
+            <span className="muted">@{session.username}</span>
             <button className="link" onClick={logOut}>
               Log out
             </button>

@@ -68,8 +68,7 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
       VITE_SUPABASE_URL=https://your-project-ref.supabase.co
       VITE_SUPABASE_ANON_KEY=sb_publishable_...
       ```
-4. **Turn on instant sign-up**: in Supabase, go to **Authentication → Sign In / Providers → Email** and switch off **Confirm email**. Otherwise new users must click an email link before they can log in.
-5. **Start the app**
+4. **Start the app**
    ```bash
    npm run dev
    ```
@@ -85,12 +84,12 @@ Every push to `main` rebuilds the live site through [.github/workflows/deploy.ym
 
 ## Verifying the Vertical Slice
 
-Users log in with an email and password (Supabase Auth). Each login owns one row in `students` (`students.user_id`), and the database only lets you create or edit your own row.
+Users log in with a username and password. Logins are stored in the `app_users` table, with passwords hashed using bcrypt, so nobody can read them. Each login owns one row in `students` (`students.user_id`). Profiles are saved only through the `save_profile` database function, which checks your login, so you can only change your own.
 
-1. Open the site and click **New here? Sign up**. Enter an email and a password (6+ characters) and click **Sign up**. You are logged in straight away, and your email shows at the top.
+1. Open the site and click **New here? Sign up**. Pick a username (3–30 letters, numbers, `.` or `_`) and a password (6+ characters), then click **Sign up**. You are logged in straight away, and `@username` shows at the top.
 2. Click **Create your profile →**. Fill in a name, choose **Pre-IS** or **IS Core**, add a course such as `IS 201`, pick one or two strengths, and click **Create profile**.
 3. The app saves the row to Supabase, reads it back, and opens **My Profile**, showing what the database returned.
 4. **Refresh the page** (F5 / Ctrl+R). You are still logged in, and My Profile shows the same data, loaded fresh from the database.
 5. Click **Edit profile**, change something (for example, the course), click **Save changes**, then refresh again. The change is still there.
-6. Click **Log out**, then log back in with the same email and password. Your profile comes back.
-7. Optional: open **Find Friends** to see yourself among the other students, or check **Table Editor → students** in the Supabase dashboard.
+6. Click **Log out**, then log back in with the same username and password. Your profile comes back.
+7. Optional: open **Find Friends** to see yourself among the other students. In the Supabase dashboard, **Table Editor → app_users** shows your login (hashed password) and **students** shows your profile.

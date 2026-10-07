@@ -1,15 +1,14 @@
 import { useState } from 'react'
-import { supabase } from '../supabaseClient.js'
+import { logIn, signUp } from '../auth.js'
 
-// Email + password login. Supabase keeps the session in the browser, so a
-// refresh keeps you logged in.
-export default function Login() {
+// Username + password login. The login is saved in the database, and this
+// browser remembers it, so a refresh keeps you logged in.
+export default function Login({ onLogin }) {
   const [mode, setMode] = useState('login') // 'login' | 'signup'
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const [notice, setNotice] = useState(null)
 
   const isSignup = mode === 'signup'
 
@@ -17,39 +16,38 @@ export default function Login() {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    setNotice(null)
-
-    const credentials = { email: email.trim(), password }
-    const { data, error } = isSignup
-      ? await supabase.auth.signUp({
-          ...credentials,
-          options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
-        })
-      : await supabase.auth.signInWithPassword(credentials)
-
-    if (error) setError(error.message)
-    // Only happens if "Confirm email" is still on in Supabase.
-    else if (isSignup && !data.session) setNotice('Check your email to confirm your account, then log in.')
-    setBusy(false)
+    try {
+      onLogin(await (isSignup ? signUp : logIn)(username, password))
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
   }
 
   function switchMode() {
     setMode(isSignup ? 'login' : 'signup')
     setError(null)
-    setNotice(null)
   }
 
   return (
     <section className="card">
       <h1>{isSignup ? 'Create your login' : 'Welcome back'}</h1>
       <p className="muted">
-        {isSignup ? 'Sign up to save your profile and find study partners.' : 'Log in to see your profile and study partners.'}
+        {isSignup ? 'Pick a username and password to save your profile.' : 'Log in to see your profile and study partners.'}
       </p>
 
       <form onSubmit={handleSubmit} className="form">
         <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          Username
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            placeholder="e.g. jamie.rivera"
+            required
+          />
         </label>
         <label>
           Password
@@ -64,7 +62,6 @@ export default function Login() {
         </label>
 
         {error && <p className="error">{error}</p>}
-        {notice && <p className="notice">{notice}</p>}
 
         <div className="row">
           <button type="submit" className="primary" disabled={busy}>
