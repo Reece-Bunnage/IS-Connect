@@ -1,24 +1,27 @@
 import { useState } from 'react'
-import { supabase } from '../supabaseClient.js'
-import { rpc, useQuery } from '../api.js'
+import { rpc, useRpc } from '../api.js'
 import { formatWhen } from '../time.js'
 import { Avatar, PageHeader } from '../ui.jsx'
 
-const STATUS_LABEL = { requested: 'Waiting to confirm', confirmed: 'Confirmed', completed: 'Completed', cancelled: 'Cancelled' }
+const STATUS_LABEL = {
+  requested: 'Waiting to confirm',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+}
+const FEEDBACK = [
+  ['great', 'Great!'],
+  ['okay', 'It was okay'],
+  ['no_show', "Didn't happen"],
+]
 
-export default function Meetups({ go, me }) {
+export default function Meetups({ go, me, refreshCounts, showToast }) {
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState(null)
+  const [reschedule, setReschedule] = useState(null) // { id, value }
 
-  const meetups = useQuery(
-    () =>
-      supabase
-        .from('meetups')
-        .select('id, scheduled_at, location, status, requester_id, partner_id, requester:requester_id(full_name), partner:partner_id(full_name)')
-        .or(`requester_id.eq.${me.id},partner_id.eq.${me.id}`)
-        .order('scheduled_at'),
-    [me.id],
-  )
+  const meetups = useRpc('my_meetups', {}, [me.id])
 
   if (meetups.error) return <p className="error">Could not load meetups: {meetups.error}</p>
   if (!meetups.data) return <p className="muted">Loading meetups…</p>
@@ -28,12 +31,15 @@ export default function Meetups({ go, me }) {
   const upcoming = meetups.data.filter(isUpcoming)
   const past = meetups.data.filter((m) => !isUpcoming(m)).reverse()
 
-  async function setStatus(m, status) {
+  async function act(m, fn, args, toastText) {
     setBusyId(m.id)
     setError(null)
     try {
-      await rpc('set_meetup_status', { p_meetup_id: m.id, p_status: status })
+      await rpc(fn, { p_meetup_id: m.id, ...args })
       await meetups.reload()
+      refreshCounts()
+      setReschedule(null)
+      if (toastText) showToast({ text: toastText })
     } catch (err) {
       setError(err.message)
     }
@@ -41,41 +47,95 @@ export default function Meetups({ go, me }) {
   }
 
   function card(m) {
-    const iAsked = m.requester_id === me.id
-    const other = iAsked ? m.partner : m.requester
-    const otherId = iAsked ? m.partner_id : m.requester_id
     const busy = busyId === m.id
     const inPast = new Date(m.scheduled_at) < now
+    const first = m.other_name.split(' ')[0]
+    const end = new Date(new Date(m.scheduled_at).getTime() + m.duration_minutes * 60000)
+    const needsFeedback = inPast && ['confirmed', 'completed'].includes(m.status) && !m.my_feedback
     return (
       <article key={m.id} className="card person">
-        <Avatar name={other.full_name} />
+        <Avatar name={m.other_name} color={m.other_color} />
         <div className="person-body">
           <h3>
-            {other.full_name} <span className={`badge status-${m.status}`}>{STATUS_LABEL[m.status]}</span>
+            {m.other_name} <span className={`badge status-${m.status}`}>{STATUS_LABEL[m.status]}</span>
           </h3>
           <p>
-            📅 {formatWhen(m.scheduled_at)}
+            📅 {formatWhen(m.scheduled_at)} – {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
             <br />📍 {m.location}
+            {m.topic && (
+              <>
+                <br />📝 {m.topic}
+              </>
+            )}
           </p>
-          <p className="muted">{iAsked ? 'You asked to meet.' : `${other.full_name.split(' ')[0]} asked to meet.`}</p>
+          <p className="muted">
+            {m.status === 'expired'
+              ? 'Nobody confirmed this before it started.'
+              : m.status === 'requested'
+                ? m.i_asked
+                  ? `Waiting for ${first} to confirm.`
+                  : `${first} asked to meet. Does this time work?`
+                : m.i_asked
+                  ? 'You set this up.'
+                  : `${first} set this up.`}
+          </p>
+
+          {needsFeedback && (
+            <div className="feedback">
+              <p>
+                <strong>How did it go?</strong>
+              </p>
+              <div className="row">
+                {FEEDBACK.map(([id, label]) => (
+                  <button key={id} className="secondary small" disabled={busy} onClick={() => act(m, 'meetup_feedback', { p_feedback: id }, id === 'great' ? 'Awesome! Keep it going 💪' : 'Thanks for letting us know.')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {reschedule?.id === m.id && (
+            <form
+              className="row reschedule"
+              onSubmit={(e) => {
+                e.preventDefault()
+                act(m, 'propose_new_time', { p_scheduled_at: new Date(reschedule.value).toISOString() }, `New time sent to ${first}.`)
+              }}
+            >
+              <input type="datetime-local" value={reschedule.value} onChange={(e) => setReschedule({ ...reschedule, value: e.target.value })} aria-label="New date and time" required />
+              <button type="submit" className="primary small" disabled={busy || !reschedule.value}>
+                Send new time
+              </button>
+              <button type="button" className="secondary small" onClick={() => setReschedule(null)}>
+                Cancel
+              </button>
+            </form>
+          )}
+
           <div className="row actions">
-            {m.status === 'requested' && !iAsked && !inPast && (
-              <button className="primary small" disabled={busy} onClick={() => setStatus(m, 'confirmed')}>
+            {m.status === 'requested' && !m.i_asked && (
+              <button className="primary small" disabled={busy} onClick={() => act(m, 'set_meetup_status', { p_status: 'confirmed' }, `Confirmed! ${first} will be notified.`)}>
                 Confirm
               </button>
             )}
+            {['requested', 'confirmed'].includes(m.status) && !inPast && reschedule?.id !== m.id && (
+              <button className="secondary small" disabled={busy} onClick={() => setReschedule({ id: m.id, value: '' })}>
+                Suggest new time
+              </button>
+            )}
             {['requested', 'confirmed'].includes(m.status) && !inPast && (
-              <button className="secondary small" disabled={busy} onClick={() => setStatus(m, 'cancelled')}>
-                {m.status === 'requested' && !iAsked ? 'Decline' : 'Cancel'}
+              <button className="link small" disabled={busy} onClick={() => act(m, 'set_meetup_status', { p_status: 'cancelled' })}>
+                {m.status === 'requested' && !m.i_asked ? 'Decline' : 'Cancel meetup'}
               </button>
             )}
-            {m.status === 'confirmed' && inPast && (
-              <button className="primary small" disabled={busy} onClick={() => setStatus(m, 'completed')}>
-                Mark completed
+            {(m.status === 'completed' || m.my_feedback === 'great' || m.status === 'expired') && (
+              <button className="secondary small" onClick={() => go('setupMeetup', { partnerId: m.other_id, topic: m.topic })}>
+                {m.status === 'expired' ? 'Try another time' : 'Meet again'}
               </button>
             )}
-            <button className="secondary small" onClick={() => go('messages', { studentId: otherId })}>
-              Message
+            <button className="link small" onClick={() => go('messages', { studentId: m.other_id })}>
+              Message {first}
             </button>
           </div>
         </div>
@@ -108,7 +168,7 @@ export default function Meetups({ go, me }) {
           <div className="list">{upcoming.map(card)}</div>
           {past.length > 0 && (
             <>
-              <h2 className="spaced">Past & cancelled</h2>
+              <h2 className="spaced">Past, cancelled & expired</h2>
               <div className="list">{past.map(card)}</div>
             </>
           )}

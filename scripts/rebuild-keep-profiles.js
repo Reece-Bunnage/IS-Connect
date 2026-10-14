@@ -12,23 +12,22 @@ await client.connect()
 try {
   await client.query('begin')
   const { rows: keep } = await client.query(
-    'select full_name, avatar_url, program_status, current_course, looking_for_help_with, bio, created_at from students order by created_at',
+    'select full_name, program_status, looking_for_help_with, bio, created_at from students order by created_at',
   )
   console.log(`Saved ${keep.length} existing profiles`)
 
   await client.query(await readFile('supabase/schema.sql', 'utf8'))
   await client.query(await readFile('supabase/functions.sql', 'utf8'))
+  await client.query(await readFile('supabase/reference.sql', 'utf8'))
   await client.query(await readFile('supabase/seed.sql', 'utf8'))
 
   for (const r of keep) {
     await client.query(
-      `insert into students (full_name, avatar_url, program_status, current_course, looking_for_help_with, bio, created_at)
-       values ($1, $2, $3, $4, $5, $6, coalesce($7, now()))`,
+      `insert into students (full_name, program_status, looking_for_help_with, bio, created_at)
+       values ($1, $2, $3, $4, coalesce($5, now()))`,
       [
         r.full_name,
-        r.avatar_url,
-        ['pre_is', 'is_core'].includes(r.program_status) ? r.program_status : 'pre_is',
-        r.current_course,
+        ['pre_is', 'is_core', 'is_minor', 'ta'].includes(r.program_status) ? r.program_status : 'pre_is',
         r.looking_for_help_with,
         r.bio,
         r.created_at,

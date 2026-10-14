@@ -7,7 +7,7 @@ import { PageHeader } from '../ui.jsx'
 const HOURS = Array.from({ length: 13 }, (_, i) => `${String(8 + i).padStart(2, '0')}:00`) // 8 AM - 8 PM
 
 // Your weekly free times, saved to availability_slots (one hour each).
-export default function Calendar({ go, me }) {
+export default function Calendar({ go, me, onSaved }) {
   const [day, setDay] = useState('Mon')
   const [picked, setPicked] = useState(null) // Set of 'Mon 16:00'
   const [saving, setSaving] = useState(false)
@@ -25,6 +25,8 @@ export default function Calendar({ go, me }) {
       setPicked(new Set(slots.data.map((s) => `${s.day_of_week} ${s.start_time.slice(0, 5)}`)))
     }
   }, [slots.data, picked])
+
+  const stale = me.availability_updated_at && Date.now() - new Date(me.availability_updated_at) > 60 * 864e5
 
   if (slots.error) return <p className="error">Could not load your availability: {slots.error}</p>
   if (!picked) return <p className="muted">Loading your availability…</p>
@@ -53,6 +55,7 @@ export default function Calendar({ go, me }) {
         return { day: d, start_time: t, duration_minutes: 60 }
       })
       await rpc('set_availability', { p_slots: payload })
+      await onSaved()
       if (thenFind) go('findFriends', { freeMatch: true })
       else setSaved(true)
     } catch (err) {
@@ -68,6 +71,12 @@ export default function Calendar({ go, me }) {
       <section className="card">
         <h2>Your weekly availability</h2>
         <p className="muted">Pick a day, then tap the hours you're free. Each one is a 1-hour study block.</p>
+        {me.availability_updated_at && (
+          <p className={stale ? 'notice' : 'muted small-text'}>
+            {stale ? '⏰ ' : ''}Last updated {new Date(me.availability_updated_at).toLocaleDateString()}.
+            {stale && " New semester? Check these are still right, then save so classmates don't see old times."}
+          </p>
+        )}
 
         <div className="segmented days">
           {DAYS.map((d) => {

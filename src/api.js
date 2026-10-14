@@ -10,14 +10,23 @@ export async function rpc(fn, args = {}) {
   return data
 }
 
-// Run a Supabase read and keep its result. reload() re-runs it without
-// blanking the current data, so lists don't flicker after an action.
+// Run a read and keep its result. reload() re-runs it without blanking the
+// current data, so lists don't flicker after an action. `run` returns a
+// Supabase response ({ data, error }) or a promise of the data itself.
 export function useQuery(run, deps) {
   const [state, setState] = useState({ data: null, error: null })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const reload = useCallback(async () => {
-    const { data, error } = await run()
-    setState({ data: error ? null : data, error: error?.message ?? null })
+    try {
+      const result = await run()
+      if (result && typeof result === 'object' && 'error' in result && 'data' in result) {
+        setState({ data: result.error ? null : result.data, error: result.error?.message ?? null })
+      } else {
+        setState({ data: result, error: null })
+      }
+    } catch (err) {
+      setState((s) => ({ data: s.data, error: err.message }))
+    }
   }, deps)
   useEffect(() => {
     reload()
@@ -25,16 +34,21 @@ export function useQuery(run, deps) {
   return { ...state, reload }
 }
 
+// A database function's result, as a query.
+export function useRpc(fn, args, deps) {
+  return useQuery(() => rpc(fn, args), deps)
+}
+
 // Students hidden from you because either of you blocked the other.
 export function useHiddenIds(meId) {
-  const { data, reload } = useQuery(
-    () =>
-      supabase
-        .from('user_blocks')
-        .select('blocker_id, blocked_id')
-        .or(`blocker_id.eq.${meId},blocked_id.eq.${meId}`),
-    [meId],
-  )
-  const hidden = new Set((data ?? []).map((b) => (b.blocker_id === meId ? b.blocked_id : b.blocker_id)))
-  return { hidden, reload }
+  const { data, reload } = useQuery(() => (meId ? rpc('my_hidden_ids') : Promise.resolve([])), [meId])
+  return { hidden: new Set(data ?? []), reload }
+}
+
+// Re-run `fn` every `ms` while the screen is open.
+export function usePolling(fn, ms) {
+  useEffect(() => {
+    const timer = setInterval(fn, ms)
+    return () => clearInterval(timer)
+  }, [fn, ms])
 }

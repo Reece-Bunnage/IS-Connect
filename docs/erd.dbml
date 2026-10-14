@@ -1,13 +1,39 @@
 // IS-Connect ERD -- paste into https://dbdiagram.io to view or edit.
 
+TableGroup logins { app_users app_sessions }
+TableGroup profiles { students skills courses student_skills student_needs student_courses availability_slots }
+TableGroup social { friendships messages message_requests meetups user_blocks reports notifications }
+TableGroup groups { study_groups group_members group_messages study_queue }
+TableGroup resources { study_resources saved_resources }
+
+Table app_users {
+  id uuid [pk]
+  username text [unique, not null]
+  password_hash text [not null, note: 'bcrypt']
+  recovery_hash text [note: 'bcrypt hash of the one-time recovery code']
+  is_admin boolean [not null, default: false]
+  created_at timestamptz
+}
+
+Table app_sessions {
+  token uuid [pk]
+  user_id uuid [not null, ref: > app_users.id]
+  created_at timestamptz
+}
+
 Table students {
   id uuid [pk]
+  user_id uuid [unique, ref: - app_users.id, note: 'null for demo students']
   full_name text [not null]
-  avatar_url text
-  program_status text [not null, note: 'pre_is or is_core']
-  current_course text [note: 'e.g. IS 201']
-  looking_for_help_with text
+  avatar_color text [not null]
+  program_status text [not null, note: 'pre_is, is_core, is_minor, ta']
+  graduation_year int
+  looking_for_help_with text [note: 'optional note; tags are in student_needs']
+  ask_me_about text [note: 'icebreaker']
   bio text
+  contact_setting text [not null, note: 'anyone, courses, friends']
+  availability_updated_at timestamptz
+  last_active_at timestamptz
   created_at timestamptz
 }
 
@@ -16,60 +42,146 @@ Table skills {
   name text [unique, not null]
 }
 
+Table courses {
+  id bigint [pk]
+  code text [unique, not null, note: 'e.g. IS 201']
+  name text [not null]
+}
+
 Table student_skills {
   student_id uuid [pk, ref: > students.id]
   skill_id bigint [pk, ref: > skills.id]
-  Note: 'Join table: students <> skills is many-to-many'
+}
+
+Table student_needs {
+  student_id uuid [pk, ref: > students.id]
+  skill_id bigint [pk, ref: > skills.id]
+}
+
+Table student_courses {
+  student_id uuid [pk, ref: > students.id]
+  course_id bigint [pk, ref: > courses.id]
+}
+
+Table availability_slots {
+  id bigint [pk]
+  student_id uuid [not null, ref: > students.id]
+  day_of_week text [not null, note: 'Mon..Sun']
+  start_time time [not null]
+  duration_minutes int [not null, default: 60]
+}
+
+Table study_resources {
+  id bigint [pk]
+  uploader_id uuid [not null, ref: > students.id]
+  title text [not null]
+  course text [note: 'a courses.code']
+  resource_url text [not null]
+  uploaded_at timestamptz
+}
+
+Table saved_resources {
+  student_id uuid [pk, ref: > students.id]
+  resource_id bigint [pk, ref: > study_resources.id]
 }
 
 Table friendships {
   id bigint [pk]
-  requester_id uuid [ref: > students.id]
-  addressee_id uuid [ref: > students.id]
-  status text [note: 'pending or accepted']
+  requester_id uuid [not null, ref: > students.id]
+  addressee_id uuid [not null, ref: > students.id]
+  status text [not null, note: 'pending or accepted']
   created_at timestamptz
 }
 
 Table messages {
   id bigint [pk]
-  sender_id uuid [ref: > students.id]
-  recipient_id uuid [ref: > students.id]
-  body text
+  sender_id uuid [not null, ref: > students.id]
+  recipient_id uuid [not null, ref: > students.id]
+  body text [not null]
   sent_at timestamptz
+  read_at timestamptz
 }
 
-Table availability_slots {
-  id bigint [pk]
-  student_id uuid [ref: > students.id]
-  day_of_week text
-  start_time time
-  duration_minutes int
+Table message_requests {
+  sender_id uuid [pk, ref: > students.id]
+  recipient_id uuid [pk, ref: > students.id]
+  status text [not null, note: 'pending, accepted, declined']
+  created_at timestamptz
 }
 
 Table meetups {
   id bigint [pk]
-  requester_id uuid [ref: > students.id]
-  partner_id uuid [ref: > students.id]
-  scheduled_at timestamptz
-  location text
-  status text [note: 'requested, confirmed, completed, cancelled']
+  requester_id uuid [not null, ref: > students.id]
+  partner_id uuid [not null, ref: > students.id]
+  scheduled_at timestamptz [not null]
+  duration_minutes int [not null, default: 60]
+  topic text
+  location text [not null]
+  status text [not null, note: 'requested, confirmed, completed, cancelled']
+  requester_feedback text [note: 'great, okay, no_show']
+  partner_feedback text
   created_at timestamptz
-}
-
-Table study_resources {
-  id bigint [pk]
-  uploader_id uuid [ref: > students.id]
-  title text
-  course text
-  resource_url text
-  uploaded_at timestamptz
 }
 
 Table user_blocks {
   id bigint [pk]
-  blocker_id uuid [ref: > students.id]
-  blocked_id uuid [ref: > students.id]
-  is_report boolean
+  blocker_id uuid [not null, ref: > students.id]
+  blocked_id uuid [not null, ref: > students.id]
+  is_report boolean [not null]
   reason text
+  created_at timestamptz
+}
+
+Table reports {
+  id bigint [pk]
+  reporter_id uuid [not null, ref: > students.id]
+  student_id uuid [ref: > students.id, note: 'either a student...']
+  resource_id bigint [ref: > study_resources.id, note: '...or a study guide']
+  reason text [not null]
+  created_at timestamptz
+  resolved_at timestamptz
+}
+
+Table notifications {
+  id bigint [pk]
+  student_id uuid [not null, ref: > students.id]
+  kind text [not null]
+  body text [not null]
+  screen text
+  params jsonb
+  created_at timestamptz
+  read_at timestamptz
+}
+
+Table study_groups {
+  id bigint [pk]
+  kind text [not null, note: 'course (one per class) or match']
+  course_id bigint [ref: > courses.id]
+  skill_id bigint [ref: > skills.id]
+  name text [not null]
+  created_at timestamptz
+}
+
+Table group_members {
+  group_id bigint [pk, ref: > study_groups.id]
+  student_id uuid [pk, ref: > students.id]
+  joined_at timestamptz
+  last_read_at timestamptz
+}
+
+Table group_messages {
+  id bigint [pk]
+  group_id bigint [not null, ref: > study_groups.id]
+  sender_id uuid [not null, ref: > students.id]
+  body text [not null]
+  sent_at timestamptz
+}
+
+Table study_queue {
+  id bigint [pk]
+  student_id uuid [not null, ref: > students.id]
+  course_id bigint [ref: > courses.id, note: 'match on a class...']
+  skill_id bigint [ref: > skills.id, note: '...or a topic']
+  matched_group_id bigint [ref: > study_groups.id]
   created_at timestamptz
 }

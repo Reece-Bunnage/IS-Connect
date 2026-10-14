@@ -2,6 +2,7 @@
 // Usage: npm run db:setup            (first-time setup)
 //        npm run db:setup -- --reset (wipe and rebuild an existing database)
 //        npm run db:functions         (update just the functions; keeps all data)
+//        npm run db:upgrade           (bring an older database up to date; keeps all data)
 // Needs SUPABASE_DB_URL in .env.local (Supabase -> Connect -> Session pooler).
 
 import { readFile } from 'node:fs/promises'
@@ -15,6 +16,7 @@ if (!url) {
 
 const reset = process.argv.includes('--reset')
 const functionsOnly = process.argv.includes('--functions-only')
+const upgrade = process.argv.includes('--upgrade')
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 
 try {
@@ -22,14 +24,16 @@ try {
 
   // schema.sql drops every table, so don't silently wipe real user data.
   const { rows } = await client.query("select to_regclass('public.students') is not null as exists")
-  if (rows[0].exists && !reset && !functionsOnly) {
+  if (rows[0].exists && !reset && !functionsOnly && !upgrade) {
     console.error('Tables already exist. Use scripts/rebuild-keep-profiles.js to keep profiles, or --reset to wipe ALL data.')
     process.exit(1)
   }
 
   const files = functionsOnly
     ? ['supabase/functions.sql']
-    : ['supabase/schema.sql', 'supabase/functions.sql', 'supabase/seed.sql']
+    : upgrade
+      ? ['supabase/upgrade.sql', 'supabase/reference.sql', 'supabase/functions.sql', 'supabase/upgrade-data.sql']
+      : ['supabase/schema.sql', 'supabase/functions.sql', 'supabase/reference.sql', 'supabase/seed.sql']
   for (const file of files) {
     await client.query(await readFile(file, 'utf8'))
     console.log(`Ran ${file}`)

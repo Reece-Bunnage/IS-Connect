@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient.js'
 
 // Username + password login backed by the sign_up / log_in / get_session
-// functions in supabase/schema.sql. The session token is kept in
+// functions in supabase/functions.sql. The session token is kept in
 // localStorage so a refresh stays logged in.
 
 const TOKEN_KEY = 'is-connect-token'
@@ -29,6 +29,7 @@ async function call(fn, args) {
   return data
 }
 
+// The session includes `recovery_code`, shown once so the student can save it.
 export async function signUp(username, password) {
   const session = await call('sign_up', { p_username: username, p_password: password })
   saveToken(session.token)
@@ -37,6 +38,17 @@ export async function signUp(username, password) {
 
 export async function logIn(username, password) {
   const session = await call('log_in', { p_username: username, p_password: password })
+  saveToken(session.token)
+  return session
+}
+
+// "Forgot password?": returns a new session and a new recovery code.
+export async function resetPassword(username, recoveryCode, newPassword) {
+  const session = await call('reset_password', {
+    p_username: username,
+    p_recovery_code: recoveryCode,
+    p_new_password: newPassword,
+  })
   saveToken(session.token)
   return session
 }
@@ -54,4 +66,9 @@ export async function logOut() {
   const token = getToken()
   saveToken(null)
   if (token) await call('log_out', { p_token: token }).catch(() => {})
+}
+
+// After deleting an account the token is already gone on the server.
+export function forgetSession() {
+  saveToken(null)
 }

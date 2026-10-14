@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
-import { rpc, useQuery } from '../api.js'
+import { rpc, useQuery, useRpc } from '../api.js'
 import { PageHeader } from '../ui.jsx'
 
 const emptyForm = { title: '', course: '', url: '' }
 
-export default function Resources({ go, me }) {
+export default function Resources({ me, showToast }) {
   const [course, setCourse] = useState('all')
   const [search, setSearch] = useState('')
+  const [savedOnly, setSavedOnly] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [reporting, setReporting] = useState(null) // { id, reason }
 
   const resources = useQuery(
     () =>
@@ -21,38 +23,50 @@ export default function Resources({ go, me }) {
         .order('uploaded_at', { ascending: false }),
     [],
   )
+  const courses = useQuery(() => supabase.from('courses').select('code').order('code'), [])
+  const saved = useRpc('my_saved_resource_ids', {}, [me.id])
 
   if (resources.error) return <p className="error">Could not load study resources: {resources.error}</p>
-  if (!resources.data) return <p className="muted">Loading study resources…</p>
+  if (!resources.data || !courses.data) return <p className="muted">Loading study resources…</p>
 
-  const courses = [...new Set(resources.data.map((r) => r.course).filter(Boolean))].sort()
+  const savedIds = new Set(saved.data ?? [])
+  const myCourses = new Set(me.student_courses.map((c) => c.courses.code))
   const q = search.trim().toLowerCase()
   const shown = resources.data.filter(
-    (r) => (course === 'all' || r.course === course) && (!q || `${r.title} ${r.course ?? ''}`.toLowerCase().includes(q)),
+    (r) =>
+      (course === 'all' || (course === 'mine' ? myCourses.has(r.course) : r.course === course)) &&
+      (!savedOnly || savedIds.has(r.id)) &&
+      (!q || `${r.title} ${r.course ?? ''}`.toLowerCase().includes(q)),
   )
+
+  async function run(fn, args, after) {
+    setError(null)
+    try {
+      await rpc(fn, args)
+      await after?.()
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
+    }
+  }
 
   async function share(e) {
     e.preventDefault()
     setBusy(true)
-    setError(null)
-    try {
-      await rpc('add_resource', { p_title: form.title, p_course: form.course, p_url: form.url })
+    if (await run('add_resource', { p_title: form.title, p_course: form.course, p_url: form.url }, resources.reload)) {
       setForm(emptyForm)
       setSharing(false)
-      await resources.reload()
-    } catch (err) {
-      setError(err.message)
+      showToast({ text: 'Thanks for sharing! 📚' })
     }
     setBusy(false)
   }
 
-  async function remove(id) {
-    setError(null)
-    try {
-      await rpc('delete_resource', { p_resource_id: id })
-      await resources.reload()
-    } catch (err) {
-      setError(err.message)
+  async function report(e) {
+    e.preventDefault()
+    if (await run('report_resource', { p_resource_id: reporting.id, p_reason: reporting.reason })) {
+      setReporting(null)
+      showToast({ text: 'Thanks. An admin will review it.' })
     }
   }
 
@@ -64,7 +78,7 @@ export default function Resources({ go, me }) {
 
       {!sharing && (
         <div className="row">
-          <button className="primary" onClick={() => (me ? setSharing(true) : go('createProfile'))}>
+          <button className="primary" onClick={() => setSharing(true)}>
             + Share a study guide
           </button>
         </div>
@@ -80,13 +94,13 @@ export default function Resources({ go, me }) {
               <input value={form.title} onChange={update('title')} placeholder="e.g. IS 201 Exam 2 Review" required />
             </label>
             <label>
-              Course
-              <input value={form.course} onChange={update('course')} placeholder="e.g. IS 201" list="course-options" />
-              <datalist id="course-options">
-                {courses.map((c) => (
-                  <option key={c} value={c} />
+              Class
+              <select value={form.course} onChange={update('course')}>
+                <option value="">General / no specific class</option>
+                {courses.data.map((c) => (
+                  <option key={c.code}>{c.code}</option>
                 ))}
-              </datalist>
+              </select>
             </label>
             <label>
               Link
@@ -106,17 +120,22 @@ export default function Resources({ go, me }) {
       )}
 
       <div className="filters">
-        <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Course filter">
-          <option value="all">All courses</option>
-          {courses.map((c) => (
-            <option key={c}>{c}</option>
+        <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Class filter">
+          <option value="all">All classes</option>
+          {myCourses.size > 0 && <option value="mine">My classes</option>}
+          {courses.data.map((c) => (
+            <option key={c.code}>{c.code}</option>
           ))}
         </select>
         <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guides…" aria-label="Search" />
+        <label className="check">
+          <input type="checkbox" checked={savedOnly} onChange={(e) => setSavedOnly(e.target.checked)} />
+          Saved ({savedIds.size})
+        </label>
       </div>
 
       {!sharing && error && <p className="error">{error}</p>}
-      {shown.length === 0 && <p className="muted">No study guides match.</p>}
+      {shown.length === 0 && <p className="muted">{savedOnly ? "You haven't saved any study guides yet." : 'No study guides match.'}</p>}
 
       <div className="list">
         {shown.map((r) => (
@@ -124,18 +143,41 @@ export default function Resources({ go, me }) {
             <div>
               <h3>📄 {r.title}</h3>
               <p className="muted">
-                {r.course && `${r.course} · `}shared by {r.uploader_id === me?.id ? 'you' : r.uploader.full_name} ·{' '}
-                {new Date(r.uploaded_at).toLocaleDateString()}
+                {r.course && `${r.course} · `}shared by {r.uploader_id === me.id ? 'you' : r.uploader.full_name} · {new Date(r.uploaded_at).toLocaleDateString()}
               </p>
+              {reporting?.id === r.id && (
+                <form className="row reschedule" onSubmit={report}>
+                  <input value={reporting.reason} onChange={(e) => setReporting({ ...reporting, reason: e.target.value })} placeholder="What's wrong? e.g. broken link, spam" aria-label="Reason" required />
+                  <button type="submit" className="primary small">
+                    Send report
+                  </button>
+                  <button type="button" className="secondary small" onClick={() => setReporting(null)}>
+                    Cancel
+                  </button>
+                </form>
+              )}
             </div>
             <div className="row">
               <a className="secondary small button-link" href={r.resource_url} target="_blank" rel="noreferrer">
                 Open ↗
               </a>
-              {r.uploader_id === me?.id && (
-                <button className="link small" onClick={() => remove(r.id)}>
+              <button
+                className={`secondary small ${savedIds.has(r.id) ? 'on' : ''}`}
+                aria-pressed={savedIds.has(r.id)}
+                onClick={() => run('toggle_saved_resource', { p_resource_id: r.id }, saved.reload)}
+              >
+                {savedIds.has(r.id) ? '★ Saved' : '☆ Save'}
+              </button>
+              {r.uploader_id === me.id ? (
+                <button className="link small" onClick={() => run('delete_resource', { p_resource_id: r.id }, resources.reload)}>
                   Delete
                 </button>
+              ) : (
+                reporting?.id !== r.id && (
+                  <button className="link small muted-link" onClick={() => setReporting({ id: r.id, reason: '' })}>
+                    Report
+                  </button>
+                )
               )}
             </div>
           </article>

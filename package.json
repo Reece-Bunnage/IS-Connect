@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "db:setup": "node --env-file-if-exists=.env.local scripts/db-setup.js",
-    "db:functions": "node --env-file-if-exists=.env.local scripts/db-setup.js --functions-only"
+    "db:functions": "node --env-file-if-exists=.env.local scripts/db-setup.js --functions-only",
+    "db:upgrade": "node --env-file-if-exists=.env.local scripts/db-setup.js --upgrade",
+    "make-admin": "node --env-file-if-exists=.env.local scripts/make-admin.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

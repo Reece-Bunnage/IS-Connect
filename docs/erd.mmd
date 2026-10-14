@@ -2,36 +2,104 @@
 title: IS-Connect ERD
 ---
 erDiagram
-    students ||--o{ student_skills : "M:N with skills (1-to-many): has strength"
-    skills ||--o{ student_skills : "M:N with students (1-to-many): held by"
-    students ||--o{ friendships : "1-to-many: sends request"
-    students ||--o{ friendships : "1-to-many: receives request"
-    students ||--o{ messages : "1-to-many: sends"
-    students ||--o{ messages : "1-to-many: receives"
+    app_users ||--o| students : "1-to-0..1: owns profile"
+    app_users ||--o{ app_sessions : "1-to-many: logged-in browsers"
+    students ||--o{ student_skills : "M:N with skills: strong in"
+    skills ||--o{ student_skills : "M:N with students"
+    students ||--o{ student_needs : "M:N with skills: needs help with"
+    skills ||--o{ student_needs : "M:N with students"
+    students ||--o{ student_courses : "M:N with courses: takes"
+    courses ||--o{ student_courses : "M:N with students"
     students ||--o{ availability_slots : "1-to-many: is free during"
-    students ||--o{ meetups : "1-to-many: requests"
-    students ||--o{ meetups : "1-to-many: is partner in"
-    students ||--o{ study_resources : "1-to-many: uploads"
-    students ||--o{ user_blocks : "1-to-many: blocks / reports"
-    students ||--o{ user_blocks : "1-to-many: is blocked"
+    students ||--o{ study_resources : "1-to-many: shares"
+    students ||--o{ saved_resources : "M:N with study_resources: saves"
+    study_resources ||--o{ saved_resources : "M:N with students"
+    students ||--o{ friendships : "1-to-many: sends / receives (2 FKs)"
+    students ||--o{ messages : "1-to-many: sends / receives (2 FKs)"
+    students ||--o{ message_requests : "1-to-many: sends / receives (2 FKs)"
+    students ||--o{ meetups : "1-to-many: requests / is partner (2 FKs)"
+    students ||--o{ user_blocks : "1-to-many: blocks / is blocked (2 FKs)"
+    students ||--o{ reports : "1-to-many: reports / is reported"
+    study_resources ||--o{ reports : "1-to-many: is reported"
+    students ||--o{ notifications : "1-to-many: receives"
+    courses ||--o{ study_groups : "1-to-many: has a course group"
+    skills ||--o{ study_groups : "1-to-many: topic of match groups"
+    study_groups ||--o{ group_members : "M:N with students"
+    students ||--o{ group_members : "M:N with study_groups: belongs to"
+    study_groups ||--o{ group_messages : "1-to-many: contains"
+    students ||--o{ group_messages : "1-to-many: posts"
+    students ||--o{ study_queue : "1-to-many: waits for a match"
+    courses ||--o{ study_queue : "1-to-many: match on class"
+    skills ||--o{ study_queue : "1-to-many: match on topic"
+    study_groups ||--o{ study_queue : "1-to-many: matched into"
 
+    app_users {
+        uuid id PK
+        text username UK
+        text password_hash "bcrypt"
+        text recovery_hash "bcrypt, one-time code"
+        boolean is_admin
+        timestamptz created_at
+    }
+    app_sessions {
+        uuid token PK
+        uuid user_id FK
+        timestamptz created_at
+    }
     students {
         uuid id PK
+        uuid user_id FK,UK "null for demo students"
         text full_name
-        text avatar_url
-        text program_status "pre_is or is_core"
-        text current_course "e.g. IS 201"
-        text looking_for_help_with
+        text avatar_color
+        text program_status "pre_is, is_core, is_minor, ta"
+        int graduation_year
+        text looking_for_help_with "optional note"
+        text ask_me_about "icebreaker"
         text bio
+        text contact_setting "anyone, courses, friends"
+        timestamptz availability_updated_at
+        timestamptz last_active_at
         timestamptz created_at
     }
     skills {
         bigint id PK
         text name UK "Python, SQL, Excel..."
     }
+    courses {
+        bigint id PK
+        text code UK "IS 201"
+        text name
+    }
     student_skills {
-        uuid student_id PK, FK
-        bigint skill_id PK, FK
+        uuid student_id PK,FK
+        bigint skill_id PK,FK
+    }
+    student_needs {
+        uuid student_id PK,FK
+        bigint skill_id PK,FK
+    }
+    student_courses {
+        uuid student_id PK,FK
+        bigint course_id PK,FK
+    }
+    availability_slots {
+        bigint id PK
+        uuid student_id FK
+        text day_of_week "Mon..Sun"
+        time start_time
+        int duration_minutes
+    }
+    study_resources {
+        bigint id PK
+        uuid uploader_id FK
+        text title
+        text course "a courses.code"
+        text resource_url
+        timestamptz uploaded_at
+    }
+    saved_resources {
+        uuid student_id PK,FK
+        bigint resource_id PK,FK
     }
     friendships {
         bigint id PK
@@ -46,30 +114,26 @@ erDiagram
         uuid recipient_id FK
         text body
         timestamptz sent_at
+        timestamptz read_at
     }
-    availability_slots {
-        bigint id PK
-        uuid student_id FK
-        text day_of_week
-        time start_time
-        int duration_minutes
+    message_requests {
+        uuid sender_id PK,FK
+        uuid recipient_id PK,FK
+        text status "pending, accepted, declined"
+        timestamptz created_at
     }
     meetups {
         bigint id PK
         uuid requester_id FK
         uuid partner_id FK
         timestamptz scheduled_at
+        int duration_minutes
+        text topic
         text location
         text status "requested, confirmed, completed, cancelled"
+        text requester_feedback
+        text partner_feedback
         timestamptz created_at
-    }
-    study_resources {
-        bigint id PK
-        uuid uploader_id FK
-        text title
-        text course
-        text resource_url
-        timestamptz uploaded_at
     }
     user_blocks {
         bigint id PK
@@ -77,5 +141,53 @@ erDiagram
         uuid blocked_id FK
         boolean is_report
         text reason
+        timestamptz created_at
+    }
+    reports {
+        bigint id PK
+        uuid reporter_id FK
+        uuid student_id FK "or"
+        bigint resource_id FK "or"
+        text reason
+        timestamptz created_at
+        timestamptz resolved_at
+    }
+    notifications {
+        bigint id PK
+        uuid student_id FK
+        text kind
+        text body
+        text screen
+        jsonb params
+        timestamptz created_at
+        timestamptz read_at
+    }
+    study_groups {
+        bigint id PK
+        text kind "course or match"
+        bigint course_id FK
+        bigint skill_id FK
+        text name
+        timestamptz created_at
+    }
+    group_members {
+        bigint group_id PK,FK
+        uuid student_id PK,FK
+        timestamptz joined_at
+        timestamptz last_read_at
+    }
+    group_messages {
+        bigint id PK
+        bigint group_id FK
+        uuid sender_id FK
+        text body
+        timestamptz sent_at
+    }
+    study_queue {
+        bigint id PK
+        uuid student_id FK
+        bigint course_id FK "or"
+        bigint skill_id FK "or"
+        bigint matched_group_id FK
         timestamptz created_at
     }

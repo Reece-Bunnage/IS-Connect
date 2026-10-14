@@ -4,6 +4,12 @@ import { rpc, useHiddenIds, useQuery } from '../api.js'
 import { formatSlot, formatWhen, nextDateFor, sharedSlots } from '../time.js'
 import { Avatar, PageHeader, programLabel } from '../ui.jsx'
 
+const DURATIONS = [
+  [30, '30 minutes'],
+  [60, '1 hour'],
+  [90, '1.5 hours'],
+  [120, '2 hours'],
+]
 const PLACES = ['Library, 2nd floor study room', 'Business building commons', 'Student center', 'Online (Zoom)']
 
 // Step 1: pick a partner, a time you're both free, and a place.
@@ -14,6 +20,8 @@ export default function SetupMeetup({ go, me, params }) {
   const [custom, setCustom] = useState('')
   const [place, setPlace] = useState(PLACES[0])
   const [otherPlace, setOtherPlace] = useState('')
+  const [duration, setDuration] = useState(60)
+  const [topic, setTopic] = useState(params.topic ?? '')
   const [step, setStep] = useState('pick')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -22,7 +30,7 @@ export default function SetupMeetup({ go, me, params }) {
     () =>
       supabase
         .from('students')
-        .select('id, full_name, program_status, current_course, user_id, availability_slots(day_of_week, start_time, duration_minutes)')
+        .select('id, full_name, avatar_color, program_status, user_id, student_courses(courses(code)), availability_slots(day_of_week, start_time, duration_minutes)')
         .order('full_name'),
     [],
   )
@@ -50,6 +58,8 @@ export default function SetupMeetup({ go, me, params }) {
       await rpc('request_meetup', {
         p_partner_id: partner.id,
         p_scheduled_at: when.toISOString(),
+        p_duration_minutes: duration,
+        p_topic: topic,
         p_location: where,
       })
       go('meetups')
@@ -65,25 +75,33 @@ export default function SetupMeetup({ go, me, params }) {
         <PageHeader title="Confirm your meetup." text="Check the details before sending your request." />
         <section className="card confirm">
           <div className="person">
-            <Avatar name={partner.full_name} />
+            <Avatar name={partner.full_name} color={partner.avatar_color} />
             <div>
               <h2>{partner.full_name}</h2>
               <p className="muted">
                 {programLabel(partner.program_status)}
-                {partner.current_course && ` · ${partner.current_course}`}
+                {partner.student_courses.length > 0 && ` · ${partner.student_courses.map((c) => c.courses.code).join(', ')}`}
               </p>
             </div>
           </div>
           <dl className="details">
             <dt>When</dt>
-            <dd>{formatWhen(when)} · 1 hour</dd>
+            <dd>
+              {formatWhen(when)} · {DURATIONS.find((d) => d[0] === duration)[1]}
+            </dd>
+            {topic.trim() && (
+              <>
+                <dt>Topic</dt>
+                <dd>{topic}</dd>
+              </>
+            )}
             <dt>Where</dt>
             <dd>{where}</dd>
             <dt>Next step</dt>
             <dd>
               {partner.user_id
                 ? `${partner.full_name.split(' ')[0]} will see your request in My Meetups and can confirm it.`
-                : 'This is a sample student, so they confirm right away.'}
+                : 'This is a demo student, so they confirm right away.'}
             </dd>
           </dl>
           {error && <p className="error">{error}</p>}
@@ -117,7 +135,7 @@ export default function SetupMeetup({ go, me, params }) {
             {options.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.full_name} ({programLabel(s.program_status)}
-                {s.current_course && `, ${s.current_course}`})
+                {s.student_courses.length > 0 && `, ${s.student_courses.map((c) => c.courses.code).join(', ')}`})
               </option>
             ))}
           </select>
@@ -154,7 +172,24 @@ export default function SetupMeetup({ go, me, params }) {
               <input type="datetime-local" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Date and time" />
             )}
             {when && <p className="muted">📅 {formatWhen(when)}</p>}
+            <label>
+              How long?
+              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+                {DURATIONS.map(([m, label]) => (
+                  <option key={m} value={m}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </fieldset>
+        )}
+
+        {partner && (
+          <label>
+            What do you want to study? (optional)
+            <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. IS 201 exam 2 review" maxLength={120} />
+          </label>
         )}
 
         {partner && (
