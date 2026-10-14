@@ -1,4 +1,4 @@
-// One-off: rebuild the database from schema.sql + seed.sql while keeping the
+// One-off: rebuild the database from schema.sql, functions.sql and seed.sql while keeping the
 // profiles already in `students`. Runs as one transaction, so if anything
 // fails nothing changes.
 // Usage: node --env-file=.env.local scripts/rebuild-keep-profiles.js
@@ -17,6 +17,7 @@ try {
   console.log(`Saved ${keep.length} existing profiles`)
 
   await client.query(await readFile('supabase/schema.sql', 'utf8'))
+  await client.query(await readFile('supabase/functions.sql', 'utf8'))
   await client.query(await readFile('supabase/seed.sql', 'utf8'))
 
   for (const r of keep) {

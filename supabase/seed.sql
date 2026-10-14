@@ -1,4 +1,4 @@
--- IS-Connect sample data. Run after schema.sql.
+-- IS-Connect sample data. Run after schema.sql and functions.sql.
 
 insert into skills (id, name) values
   (1, 'Python'), (2, 'SQL'), (3, 'Excel'), (4, 'Hardware'),
@@ -38,7 +38,15 @@ insert into availability_slots (student_id, day_of_week, start_time, duration_mi
   ('00000000-0000-0000-0000-000000000001', 'Wed', '15:00', 60),
   ('00000000-0000-0000-0000-000000000002', 'Wed', '15:00', 90),
   ('00000000-0000-0000-0000-000000000003', 'Tue', '10:00', 60),
-  ('00000000-0000-0000-0000-000000000004', 'Fri', '14:00', 60);
+  ('00000000-0000-0000-0000-000000000004', 'Fri', '14:00', 60),
+  ('00000000-0000-0000-0000-000000000002', 'Mon', '16:00', 60),
+  ('00000000-0000-0000-0000-000000000003', 'Mon', '16:00', 60),
+  ('00000000-0000-0000-0000-000000000003', 'Thu', '13:00', 60),
+  ('00000000-0000-0000-0000-000000000004', 'Tue', '10:00', 60),
+  ('00000000-0000-0000-0000-000000000005', 'Wed', '15:00', 60),
+  ('00000000-0000-0000-0000-000000000005', 'Thu', '13:00', 60),
+  ('00000000-0000-0000-0000-000000000006', 'Tue', '10:00', 60),
+  ('00000000-0000-0000-0000-000000000006', 'Fri', '14:00', 60);
 
 insert into meetups (requester_id, partner_id, scheduled_at, location, status) values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', now() + interval '2 days', 'Library, 2nd floor study room', 'confirmed'),
@@ -48,7 +56,9 @@ insert into meetups (requester_id, partner_id, scheduled_at, location, status) v
 insert into study_resources (uploader_id, title, course, resource_url) values
   ('00000000-0000-0000-0000-000000000004', 'IS 201 Exam 1 Study Guide',    'IS 201', 'https://example.com/is201-exam1-guide.pdf'),
   ('00000000-0000-0000-0000-000000000002', 'Excel Shortcuts Cheat Sheet',  'IS 110', 'https://example.com/excel-shortcuts.pdf'),
-  ('00000000-0000-0000-0000-000000000006', 'Subnetting Practice Problems', 'IS 303', 'https://example.com/subnetting-practice.pdf');
+  ('00000000-0000-0000-0000-000000000006', 'Subnetting Practice Problems', 'IS 303', 'https://example.com/subnetting-practice.pdf'),
+  ('00000000-0000-0000-0000-000000000001', 'SQL JOINs Cheat Sheet',        'IS 201', 'https://example.com/sql-joins-cheat-sheet.pdf'),
+  ('00000000-0000-0000-0000-000000000003', 'Python Loops Practice Set',    'IS 201', 'https://example.com/python-loops-practice.pdf');
 
 insert into user_blocks (blocker_id, blocked_id, is_report, reason) values
   ('00000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000004', false, 'Not a good study fit'),

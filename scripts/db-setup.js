@@ -1,6 +1,7 @@
 // Creates the IS-Connect tables in Supabase and loads the sample data.
 // Usage: npm run db:setup            (first-time setup)
 //        npm run db:setup -- --reset (wipe and rebuild an existing database)
+//        npm run db:functions         (update just the functions; keeps all data)
 // Needs SUPABASE_DB_URL in .env.local (Supabase -> Connect -> Session pooler).
 
 import { readFile } from 'node:fs/promises'
@@ -13,6 +14,7 @@ if (!url) {
 }
 
 const reset = process.argv.includes('--reset')
+const functionsOnly = process.argv.includes('--functions-only')
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 
 try {
@@ -20,12 +22,15 @@ try {
 
   // schema.sql drops every table, so don't silently wipe real user data.
   const { rows } = await client.query("select to_regclass('public.students') is not null as exists")
-  if (rows[0].exists && !reset) {
+  if (rows[0].exists && !reset && !functionsOnly) {
     console.error('Tables already exist. Use scripts/rebuild-keep-profiles.js to keep profiles, or --reset to wipe ALL data.')
     process.exit(1)
   }
 
-  for (const file of ['supabase/schema.sql', 'supabase/seed.sql']) {
+  const files = functionsOnly
+    ? ['supabase/functions.sql']
+    : ['supabase/schema.sql', 'supabase/functions.sql', 'supabase/seed.sql']
+  for (const file of files) {
     await client.query(await readFile(file, 'utf8'))
     console.log(`Ran ${file}`)
   }

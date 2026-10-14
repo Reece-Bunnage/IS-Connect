@@ -6,7 +6,7 @@ A web app that helps pre-IS students find classmates to study with, ask for help
 
 ## App Summary
 
-Many pre-IS students want to join the Information Systems program but feel less technical than their peers. They are busy and nervous to ask strangers for help, so they end up studying alone and some give up on applying. IS-Connect gives these students a low-pressure way to find someone in a similar situation. A student creates a short profile that says whether they are Pre-IS or in the IS Core, which course they are taking, what they need help with, and what their strengths are (Python, SQL, Excel, etc.). Other students can browse and filter those profiles in **Find Friends** to find a study partner who can help with exactly what they are stuck on. The app also has screens for messages, scheduling meetups, shared study guides, a daily IS tip, and blocking/reporting. In this milestone, **Create profile** saves to a real Postgres database, and the Messages, My Meetups, and Study Resources screens read live sample data from that database.
+Many pre-IS students want to join the Information Systems program but feel less technical than their peers. They are busy and nervous to ask strangers for help, so they end up studying alone and some give up on applying. IS-Connect gives these students a low-pressure way to find someone in a similar situation. A student creates a short profile that says whether they are Pre-IS or in the IS Core, which course they are taking, what they need help with, and what their strengths are (Python, SQL, Excel, etc.). Other students can browse and filter those profiles in **Find Friends** to find a study partner who can help with exactly what they are stuck on. Students can also add friends, chat one-on-one, set their weekly free times, schedule a study session at a time they're both free, share study-guide links, see a daily IS tip, and block or report someone. Everything a logged-in student does is saved to a real Postgres database. The screens follow our Module 4 design sprint specs and the IS Together mockup.
 
 ## ERD
 
@@ -74,11 +74,12 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
 
       | Your database | Command | What happens to existing data |
       |---|---|---|
-      | Brand new, no tables yet | `npm run db:setup` | Nothing to lose. Creates all tables, login functions and sample data. |
+      | Brand new, no tables yet | `npm run db:setup` | Nothing to lose. Creates all tables, functions and sample data. |
+      | Already set up, but [supabase/functions.sql](supabase/functions.sql) changed | `npm run db:functions` | **Keeps all data.** Only updates the database functions. |
       | Has tables you want to keep profiles from (e.g. made by hand in the Table Editor) | `node --env-file=.env.local scripts/rebuild-keep-profiles.js` | Keeps every row in `students`, rebuilds everything else. If anything fails, nothing changes. |
       | Start completely over | `npm run db:setup -- --reset` | **Deletes all data**, including logins, then rebuilds with sample data. |
 
-   (No terminal? Paste [supabase/schema.sql](supabase/schema.sql) and then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. This also deletes existing data.)
+   (No terminal? Paste [supabase/schema.sql](supabase/schema.sql), then [supabase/functions.sql](supabase/functions.sql), then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. `schema.sql` deletes existing data; `functions.sql` alone is safe to re-run.)
 
    Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has `app_users`, `app_sessions`, `students`, `skills`, `student_skills`, `friendships`, `messages`, `availability_slots`, `meetups`, `study_resources` and `user_blocks`.
 4. **Start the app**
@@ -97,12 +98,22 @@ Every push to `main` rebuilds the live site through [.github/workflows/deploy.ym
 
 ## Verifying the Vertical Slice
 
-Users log in with a username and password. Logins are stored in the `app_users` table, with passwords hashed using bcrypt, so nobody can read them. Each login owns one row in `students` (`students.user_id`). Profiles are saved only through the `save_profile` database function, which checks your login, so you can only change your own.
+**How saving works:** users log in with a username and password. Logins are stored in `app_users`, with passwords hashed using bcrypt. The website's public key can **read** the app tables but can't write to them. Every save goes through a function in [supabase/functions.sql](supabase/functions.sql) (`save_profile`, `send_message`, `request_meetup`, …). Each function checks the user's login token, so people can only change their own data.
 
-1. Open the site and click **New here? Sign up**. Pick a username (3–30 letters, numbers, `.` or `_`) and a password (6+ characters), then click **Sign up**. You are logged in straight away, and `@username` shows at the top.
-2. Click **Create your profile →**. Fill in a name, choose **Pre-IS** or **IS Core**, add a course such as `IS 201`, pick one or two strengths, and click **Create profile**.
-3. The app saves the row to Supabase, reads it back, and opens **My Profile**, showing what the database returned.
-4. **Refresh the page** (F5 / Ctrl+R). You are still logged in, and My Profile shows the same data, loaded fresh from the database.
-5. Click **Edit profile**, change something (for example, the course), click **Save changes**, then refresh again. The change is still there.
-6. Click **Log out**, then log back in with the same username and password. Your profile comes back.
-7. Optional: open **Find Friends** to see yourself among the other students. In the Supabase dashboard, **Table Editor → app_users** shows your login (hashed password) and **students** shows your profile.
+**Sample students** (Emma, Daniel, Sofia, Alex, Maya, Jordan) have no login. So one tester can try every feature alone, they accept friend requests and meetups automatically and reply once to a first message.
+
+Try this walkthrough on the live site:
+
+1. **Sign up.** Click **New here? Sign up** and pick a username and password. Your `@username` shows at the top.
+2. **Make your profile.** Click **Create your profile →**, choose Pre-IS or IS Core, enter `IS 201`, pick strengths, and save. **My Profile** shows the row read back from the database.
+3. **Set your free times.** In **Availability**, pick **Mon** and tap **4:00 PM**, then click **Save & find a partner →**.
+4. **Find a partner.** **Find Friends** opens with **Free when I'm free** on, showing Daniel and Sofia with "Free together: Mon 4:00 PM". Try the course filter (`IS 201`) and the program filter too.
+5. **Add a friend.** Click **+ Add friend** on Emma. It changes to **✓ Friends**, and she shows under **My friends**.
+6. **Message someone.** Click **Message** on Emma, send "Hi!", and her reply appears a moment later.
+7. **Schedule a meetup.** Click **Schedule a meetup →**, pick the shared time and a place, then **Review & confirm →** and **Send request**. **My Meetups** lists it as *Confirmed*.
+8. **Share a study guide.** In **Study Resources**, click **+ Share a study guide**, add a title, `IS 201` and any `https://` link. Filter by IS 201 to find it, then delete it.
+9. **Block someone.** In **Safety & Privacy**, block Emma. She disappears from Find Friends and Messages, and you can't message her. Unblock her from the **Blocked** list.
+10. **Refresh at any point.** You stay logged in on the same screen, and everything you did is still there, loaded from the database.
+11. **Log out and back in.** Everything is still there.
+
+Two real users can also try it together: one sends a friend or meetup request, and the other sees it on **Home** and accepts or confirms it.

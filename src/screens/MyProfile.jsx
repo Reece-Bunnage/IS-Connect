@@ -1,4 +1,4 @@
-import { programLabel } from './FindFriends.jsx'
+import { programLabel } from '../ui.jsx'
 
 // Your saved profile, read back from the database on every page load.
 export default function MyProfile({ go, profile }) {
