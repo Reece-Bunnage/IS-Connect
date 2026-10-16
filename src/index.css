@@ -83,7 +83,9 @@ code { font-size: 0.8rem; word-break: break-all; }
 .sidebar { display: none; }
 @media (min-width: 900px) {
   .app.signed-in { max-width: 1120px; }
-  .layout { display: grid; grid-template-columns: 210px 1fr; gap: 28px; align-items: start; }
+  /* Two columns only when the sidebar is shown (not on login or while creating a profile). */
+  .layout.has-sidebar { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; align-items: start; }
+  .layout:not(.has-sidebar) .content { max-width: 720px; margin: 0 auto; }
   .sidebar { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
   .back-home { display: none; }
 }

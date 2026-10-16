@@ -185,7 +185,7 @@ export default function App() {
         )}
       </header>
 
-      <div className="layout">
+      <div className={`layout ${session && profile ? 'has-sidebar' : ''}`}>
         {session && profile && (
           <nav className="sidebar" aria-label="Main">
             {nav.map((item) => {
