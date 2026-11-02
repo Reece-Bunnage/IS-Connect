@@ -1,16 +1,82 @@
 // Small pieces shared by several screens.
 
 export const NAV = [
-  { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'myProfile', icon: '👤', label: 'My Profile', note: 'View or edit your profile' },
-  { id: 'findFriends', icon: '🤝', label: 'Find Friends', note: 'Students to study with', badge: 'friend_requests' },
-  { id: 'messages', icon: '💬', label: 'Messages', note: 'Chat and plan to meet', badge: 'messages' },
-  { id: 'groups', icon: '👥', label: 'Study Groups', note: 'One per class, plus matches', badge: 'groups_unread' },
-  { id: 'calendar', icon: '📅', label: 'Availability', note: "When you're free" },
-  { id: 'meetups', icon: '📍', label: 'My Meetups', note: 'Upcoming & past', badge: 'meetup_requests' },
-  { id: 'resources', icon: '📚', label: 'Study Resources', note: 'Shared study guides' },
-  { id: 'blockReport', icon: '🚩', label: 'Safety & Privacy', note: 'Who can contact you' },
+  { id: 'home', icon: 'home', label: 'Home' },
+  { id: 'myProfile', icon: 'user', label: 'My Profile', short: 'Profile' },
+  { id: 'findFriends', icon: 'users', label: 'Find Friends', short: 'Friends', badge: 'friend_requests' },
+  { id: 'messages', icon: 'message', label: 'Messages', short: 'Messages', badge: 'messages' },
+  { id: 'groups', icon: 'group', label: 'Study Groups', short: 'Groups', badge: 'groups_unread' },
+  { id: 'calendar', icon: 'calendar', label: 'Availability', short: 'Free times' },
+  { id: 'meetups', icon: 'pin', label: 'My Meetups', short: 'Meetups', badge: 'meetup_requests' },
+  { id: 'resources', icon: 'book', label: 'Study Resources', short: 'Guides' },
+  { id: 'blockReport', icon: 'shield', label: 'Safety & Privacy', short: 'Safety' },
 ]
+
+// One family of simple line icons (from the IS Together mockup), drawn in the text color.
+const ICON_PATHS = {
+  home: <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" />
+      <path d="M16 4.5a3.5 3.5 0 0 1 0 7" />
+      <path d="M18 14.7c2.4.6 4 2.4 4 5.3" />
+    </>
+  ),
+  message: <path d="M4 5h16v11H9l-5 4z" />,
+  group: (
+    <>
+      <path d="M4 5h11v8H8l-4 3z" />
+      <path d="M15 9h5v8l-3-2h-6v-2" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z" />
+      <path d="M4 19V5" />
+    </>
+  ),
+  shield: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  doc: (
+    <>
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v4h4" />
+    </>
+  ),
+  bulb: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z" />,
+}
+
+export function Icon({ name, size = 18 }) {
+  return (
+    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {ICON_PATHS[name]}
+    </svg>
+  )
+}
 
 // Which nav item to highlight for screens that aren't in the nav.
 export const NAV_PARENT = { createProfile: 'myProfile', setupMeetup: 'meetups' }

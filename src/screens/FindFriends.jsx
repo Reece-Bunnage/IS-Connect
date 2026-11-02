@@ -1,44 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
-import { formatSlot, sharedSlots } from '../time.js'
+import { STUDENT_SELECT, scoreStudents } from '../matching.js'
 import { ActiveDot, Avatar, DemoBadge, PageHeader, inviteClassmate, programLabel } from '../ui.jsx'
-
-const STUDENT_SELECT =
-  'id, user_id, full_name, avatar_color, program_status, graduation_year, looking_for_help_with, ask_me_about, bio, ' +
-  'last_active_at, created_at, student_skills(skill_id, skills(name)), student_courses(course_id, courses(code)), ' +
-  'student_needs(skill_id, skills(name)), availability_slots(day_of_week, start_time, duration_minutes)'
-
-// How well another student fits you, and the reasons to show on their card.
-function match(me, s, myRow) {
-  const reasons = []
-  let score = 0
-  const myCourses = new Set(myRow.student_courses.map((c) => c.course_id))
-  const myNeeds = new Set(myRow.student_needs.map((n) => n.skill_id))
-  const mySkills = new Set(myRow.student_skills.map((k) => k.skill_id))
-
-  const sharedCourses = s.student_courses.filter((c) => myCourses.has(c.course_id)).map((c) => c.courses.code)
-  if (sharedCourses.length) {
-    score += 3 * sharedCourses.length
-    reasons.push(`In ${sharedCourses.join(', ')} with you`)
-  }
-  const canHelp = s.student_skills.filter((k) => myNeeds.has(k.skill_id)).map((k) => k.skills.name)
-  if (canHelp.length) {
-    score += 4 * canHelp.length
-    reasons.push(`Strong in ${canHelp.join(', ')}, which you need`)
-  }
-  const youHelp = s.student_needs.filter((n) => mySkills.has(n.skill_id)).map((n) => n.skills.name)
-  if (youHelp.length) {
-    score += 2 * youHelp.length
-    reasons.push(`Needs help with ${youHelp.join(', ')}, your strength`)
-  }
-  if (s.shared.length) {
-    score += 2
-    reasons.push(`Free together ${s.shared.slice(0, 2).map(formatSlot).join(', ')}`)
-  }
-  if (s.last_active_at && Date.now() - new Date(s.last_active_at) < 7 * 864e5) score += 1
-  return { score, reasons }
-}
 
 export default function FindFriends({ go, me, params, showToast, refreshCounts }) {
   const [search, setSearch] = useState('')
@@ -72,12 +36,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
   const friendOf = new Map((friendships.data ?? []).map((f) => [f.other_id, f]))
   const q = search.trim().toLowerCase()
 
-  const others = students.data
-    .filter((s) => s.id !== me.id && !hidden.has(s.id))
-    .map((s) => {
-      const withShared = { ...s, shared: sharedSlots(myRow.availability_slots, s.availability_slots) }
-      return { ...withShared, friendship: friendOf.get(s.id), ...match(me, withShared, myRow) }
-    })
+  const others = scoreStudents(students.data, me.id, hidden).map((s) => ({ ...s, friendship: friendOf.get(s.id) }))
   const requests = others.filter((s) => s.friendship?.status === 'pending' && s.friendship.incoming)
 
   const shown = others

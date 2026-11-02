@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
 import { forgetSession, logOut as endSession, restoreSession } from './auth.js'
 import { rpc, usePolling } from './api.js'
-import { NAV, NAV_PARENT, NeedsProfile, Toast, badgeCount } from './ui.jsx'
+import { Icon, NAV, NAV_PARENT, NeedsProfile, Toast, badgeCount } from './ui.jsx'
 import Login from './screens/Login.jsx'
 import Home from './screens/Home.jsx'
 import CreateProfile from './screens/CreateProfile.jsx'
@@ -148,7 +148,7 @@ export default function App() {
   else content = screens[screen] ?? screens.home
 
   const active = NAV_PARENT[screen] ?? screen
-  const nav = session?.is_admin ? [...NAV, { id: 'reports', icon: '🛡️', label: 'Reports (admin)' }] : NAV
+  const nav = session?.is_admin ? [...NAV, { id: 'reports', icon: 'doc', label: 'Reports (admin)' }] : NAV
   const notificationCount = counts?.notifications ?? 0
 
   return (
@@ -192,7 +192,7 @@ export default function App() {
               const n = badgeCount(item, counts)
               return (
                 <button key={item.id} className={`nav-item ${active === item.id ? 'on' : ''}`} onClick={() => go(item.id)}>
-                  <span aria-hidden="true">{item.icon}</span> {item.label}
+                  <Icon name={item.icon} /> {item.label}
                   {n > 0 && <span className="count">{n}</span>}
                 </button>
               )
