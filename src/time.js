@@ -65,3 +65,20 @@ export function formatWhen(value) {
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return `${date} · ${time}`
 }
+
+// Opens Google Calendar with the meetup filled in, ready to save. Nothing is shared
+// with Google until the student presses Save there.
+export function googleCalendarLink(meetup) {
+  const start = new Date(meetup.scheduled_at)
+  const end = new Date(start.getTime() + meetup.duration_minutes * 60000)
+  const stamp = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, '') // 20261105T220000Z
+  const appUrl = window.location.origin + import.meta.env.BASE_URL
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Study session with ${meetup.other_name}`,
+    dates: `${stamp(start)}/${stamp(end)}`,
+    location: meetup.location,
+    details: `${meetup.topic ? `Topic: ${meetup.topic}\n\n` : ''}Set up on IS-Connect: ${appUrl}`,
+  })
+  return `https://calendar.google.com/calendar/render?${params}`
+}

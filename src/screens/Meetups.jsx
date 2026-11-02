@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { rpc, useRpc } from '../api.js'
-import { formatWhen } from '../time.js'
+import { formatWhen, googleCalendarLink } from '../time.js'
 import { Avatar, PageHeader } from '../ui.jsx'
 
 const STATUS_LABEL = {
@@ -118,6 +118,11 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
               <button className="primary small" disabled={busy} onClick={() => act(m, 'set_meetup_status', { p_status: 'confirmed' }, `Confirmed! ${first} will be notified.`)}>
                 Confirm
               </button>
+            )}
+            {m.status === 'confirmed' && !inPast && (
+              <a className="secondary small button-link" href={googleCalendarLink(m)} target="_blank" rel="noreferrer">
+                Add to Google Calendar
+              </a>
             )}
             {['requested', 'confirmed'].includes(m.status) && !inPast && reschedule?.id !== m.id && (
               <button className="secondary small" disabled={busy} onClick={() => setReschedule({ id: m.id, value: '' })}>

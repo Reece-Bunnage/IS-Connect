@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { formatSlot, formatWhen } from '../time.js'
+import { formatSlot, formatWhen, googleCalendarLink } from '../time.js'
 import { tipOfTheDay } from '../tips.js'
 import { Avatar, CompletenessMeter, Icon, NAV, badgeCount, inviteClassmate, programLabel } from '../ui.jsx'
 
@@ -225,9 +225,16 @@ export default function Home({ go, me, counts, refreshCounts, showToast }) {
                     {next.topic && ` · ${next.topic}`}
                   </p>
                 </div>
-                <button className="text-link" onClick={() => go('messages', { studentId: next.other_id })}>
-                  Message {firstName(next.other_name)} →
-                </button>
+                <div className="meetup-links">
+                  <button className="text-link" onClick={() => go('messages', { studentId: next.other_id })}>
+                    Message {firstName(next.other_name)} →
+                  </button>
+                  {next.status === 'confirmed' && (
+                    <a className="text-link" href={googleCalendarLink(next)} target="_blank" rel="noreferrer">
+                      Add to Google Calendar
+                    </a>
+                  )}
+                </div>
               </article>
             ) : (
               <article className="home-card empty-row">
