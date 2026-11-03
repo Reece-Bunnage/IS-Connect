@@ -11,6 +11,7 @@ drop table if exists group_messages cascade;
 drop table if exists group_members cascade;
 drop table if exists study_groups cascade;
 drop table if exists notifications cascade;
+drop table if exists calendar_feeds cascade;
 drop table if exists message_requests cascade;
 drop table if exists user_blocks cascade;
 drop table if exists study_resources cascade;
@@ -165,7 +166,19 @@ create table meetups (
                      check (status in ('requested', 'confirmed', 'completed', 'cancelled')),
   requester_feedback text check (requester_feedback in ('great', 'okay', 'no_show')),
   partner_feedback   text check (partner_feedback in ('great', 'okay', 'no_show')),
-  created_at         timestamptz not null default now()
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(), -- these two tell calendar apps
+  revision           int not null default 0              -- the meetup changed (set by a trigger)
+);
+
+-- A student's private calendar link (Google Calendar, Apple Calendar or Outlook
+-- subscribe to it). Anyone with the token can see that student's meetups, so the
+-- student can reset it.
+create table calendar_feeds (
+  token           uuid primary key default gen_random_uuid(),
+  student_id      uuid not null unique references students(id) on delete cascade,
+  created_at      timestamptz not null default now(),
+  last_fetched_at timestamptz                    -- when a calendar app last checked the link
 );
 
 -- Block of another student (Safety & Privacy screen)
@@ -267,6 +280,7 @@ alter table friendships        enable row level security;
 alter table messages           enable row level security;
 alter table message_requests   enable row level security;
 alter table meetups            enable row level security;
+alter table calendar_feeds     enable row level security;
 alter table user_blocks        enable row level security;
 alter table reports            enable row level security;
 alter table saved_resources    enable row level security;

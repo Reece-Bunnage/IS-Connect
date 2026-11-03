@@ -44,6 +44,9 @@ alter table meetups drop constraint if exists meetups_requester_feedback_check;
 alter table meetups add constraint meetups_requester_feedback_check check (requester_feedback in ('great', 'okay', 'no_show'));
 alter table meetups drop constraint if exists meetups_partner_feedback_check;
 alter table meetups add constraint meetups_partner_feedback_check check (partner_feedback in ('great', 'okay', 'no_show'));
+-- Meetups: change tracking for the calendar link
+alter table meetups add column if not exists updated_at timestamptz not null default now();
+alter table meetups add column if not exists revision int not null default 0;
 
 -- New tables (same definitions as schema.sql)
 create table if not exists courses (
@@ -125,6 +128,12 @@ create table if not exists study_queue (
   matched_group_id bigint references study_groups(id) on delete set null,
   check ((course_id is null) <> (skill_id is null))
 );
+create table if not exists calendar_feeds (
+  token           uuid primary key default gen_random_uuid(),
+  student_id      uuid not null unique references students(id) on delete cascade,
+  created_at      timestamptz not null default now(),
+  last_fetched_at timestamptz
+);
 
 -- Row Level Security: lock the private tables, open the new public ones.
 alter table courses          enable row level security;
@@ -138,6 +147,7 @@ alter table study_groups     enable row level security;
 alter table group_members    enable row level security;
 alter table group_messages   enable row level security;
 alter table study_queue      enable row level security;
+alter table calendar_feeds   enable row level security;
 
 drop policy if exists "Public read" on friendships;
 drop policy if exists "Public read" on messages;
