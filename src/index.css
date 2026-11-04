@@ -151,7 +151,33 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .details dt { font-weight: 700; color: var(--muted); }
 .details dd { margin: 0; }
 .confirm .person { margin-bottom: 4px; }
-.resource { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.resources-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
+.resources-heading .page-header { flex: 1; min-width: 0; margin-bottom: 0; }
+.resources-heading .primary { flex: none; margin: 0 0 3px; }
+.resource-form, .resource-browser { padding: 18px; }
+.resource-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.resource-section-heading h2 { margin-bottom: 2px; }
+.resource-saved-filter { flex: none; }
+.resource-filters { display: grid; grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr); gap: 8px; margin-top: 14px; }
+.resource-filters select, .resource-filters input { width: 100%; min-width: 0; }
+.resource-list { display: flex; flex-direction: column; }
+.resource-card { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+.resource-details { flex: 1; min-width: 0; }
+.resource-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.resource-title-row h3 { overflow-wrap: anywhere; }
+.resource-meta { margin-top: 6px; }
+.resource-actions { align-items: center; justify-content: flex-end; }
+.resource-report { align-items: center; margin-top: 12px; }
+.resource-report input { flex: 1; min-width: 180px; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; }
+.resource-empty { margin-top: 12px; }
+@media (max-width: 560px) {
+  .resources-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .resources-heading .primary { align-self: flex-start; }
+  .resource-filters { grid-template-columns: 1fr; }
+  .resource-card { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .resource-actions { justify-content: flex-start; }
+  .resource-section-heading { align-items: flex-start; }
+}
 .person-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border); }
 .person-row:first-child { border-top: 0; }
 .person-row.highlight { background: var(--notice); margin: 0 -10px; padding: 10px; border-radius: 10px; }
