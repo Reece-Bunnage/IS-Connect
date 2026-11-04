@@ -351,3 +351,58 @@ details.members li > span { flex: 1; }
 @media (max-width: 600px) {
   .account .muted { display: none; }
 }
+.confidence-survey {
+  margin: 20px 0;
+  padding: 20px;
+  background: var(--green-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.confidence-survey h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.confidence-survey fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+
+.confidence-survey legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.confidence-rating label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  background: var(--surface);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.confidence-rating input {
+  width: auto;
+  margin: 0;
+}
+
+.survey-note-label {
+  display: block;
+}
+
+.survey-note-label textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.survey-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
