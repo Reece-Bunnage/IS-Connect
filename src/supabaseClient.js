@@ -10,4 +10,4 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
-//this is a comment
+//this is a comment2.0
