@@ -1,7 +1,9 @@
+
 import { useState } from 'react'
 import { rpc, useRpc } from '../api.js'
 import { formatWhen, googleCalendarLink } from '../time.js'
 import { Avatar, PageHeader } from '../ui.jsx'
+import ConfidenceSurvey, { ConfidenceSummary } from './ConfidenceSurvey.jsx'
 
 const STATUS_LABEL = {
   requested: 'Waiting to confirm',
@@ -22,6 +24,7 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
   const [reschedule, setReschedule] = useState(null) // { id, value }
 
   const meetups = useRpc('my_meetups', {}, [me.id])
+  const surveys = useRpc('my_meetup_surveys', {}, [me.id])
 
   if (meetups.error) return <p className="error">Could not load meetups: {meetups.error}</p>
   if (!meetups.data) return <p className="muted">Loading meetups…</p>
@@ -94,7 +97,15 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
               </div>
             </div>
           )}
-
+          {m.my_feedback === 'great' && <ConfidenceSummary survey={surveys.data.find((s) => s.meetup_id === m.id)} />}{end.getTime() <= now &&
+  ['confirmed', 'completed'].includes(m.status) &&
+  m.my_feedback !== 'no_show' && (
+    <ConfidenceSurvey
+      key={m.id}
+      meetup={m}
+      surveys={surveys}
+    />
+  )}
           {reschedule?.id === m.id && (
             <form
               className="row reschedule"
@@ -173,7 +184,7 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
           <div className="list">{upcoming.map(card)}</div>
         </>
       )}
-
+      <ConfidenceSummary surveys={surveys} />
       <CalendarLink me={me} showToast={showToast} />
 
       {past.length > 0 && (
