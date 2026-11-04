@@ -74,20 +74,23 @@ export default function Resources({ me, showToast }) {
 
   return (
     <>
-      <PageHeader title="Learn from each other." text="Study guides, notes and practice sets made by students, for students." />
-
-      {!sharing && (
-        <div className="row">
+      <div className="resources-heading">
+        <PageHeader title="Learn from each other." text="Study guides, notes and practice sets made by students, for students." />
+        {!sharing && (
           <button className="primary" onClick={() => setSharing(true)}>
             + Share a study guide
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {sharing && (
-        <section className="card">
-          <h2>Share a study guide</h2>
-          <p className="muted">Paste a link to a Google Doc, Drive file, Canva, Quizlet, or anything others can open.</p>
+        <section className="card resource-form">
+          <div className="resource-section-heading">
+            <div>
+              <h2>Share a study guide</h2>
+              <p className="muted">Add a link your classmates can open.</p>
+            </div>
+          </div>
           <form className="form" onSubmit={share}>
             <label>
               Title
@@ -119,34 +122,52 @@ export default function Resources({ me, showToast }) {
         </section>
       )}
 
-      <div className="filters">
-        <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Class filter">
-          <option value="all">All classes</option>
-          {myCourses.size > 0 && <option value="mine">My classes</option>}
-          {courses.data.map((c) => (
-            <option key={c.code}>{c.code}</option>
-          ))}
-        </select>
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guides…" aria-label="Search" />
-        <label className="check">
-          <input type="checkbox" checked={savedOnly} onChange={(e) => setSavedOnly(e.target.checked)} />
-          Saved ({savedIds.size})
-        </label>
-      </div>
+      <section className="card resource-browser" aria-label="Browse study resources">
+        <div className="resource-section-heading">
+          <div>
+            <h2>Browse resources</h2>
+            <p className="muted">{shown.length} {shown.length === 1 ? 'guide' : 'guides'}</p>
+          </div>
+          <label className="check resource-saved-filter">
+            <input type="checkbox" checked={savedOnly} onChange={(e) => setSavedOnly(e.target.checked)} />
+            Saved <span className="count">{savedIds.size}</span>
+          </label>
+        </div>
+        <div className="resource-filters">
+          <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Class filter">
+            <option value="all">All classes</option>
+            {myCourses.size > 0 && <option value="mine">My classes</option>}
+            {courses.data.map((c) => (
+              <option key={c.code}>{c.code}</option>
+            ))}
+          </select>
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guides…" aria-label="Search" />
+        </div>
+      </section>
 
       {!sharing && error && <p className="error">{error}</p>}
-      {shown.length === 0 && <p className="muted">{savedOnly ? "You haven't saved any study guides yet." : 'No study guides match.'}</p>}
+      {shown.length === 0 && (
+        <section className="card empty resource-empty">
+          <h2>{savedOnly ? 'No saved guides yet' : 'No study guides found'}</h2>
+          <p className="muted">
+            {savedOnly ? 'Save a guide with the star button and it will appear here.' : 'Try another search or class, or share a guide with your classmates.'}
+          </p>
+        </section>
+      )}
 
-      <div className="list">
+      <div className="resource-list">
         {shown.map((r) => (
-          <article key={r.id} className="card resource">
-            <div>
-              <h3>📄 {r.title}</h3>
-              <p className="muted">
-                {r.course && `${r.course} · `}shared by {r.uploader_id === me.id ? 'you' : r.uploader.full_name} · {new Date(r.uploaded_at).toLocaleDateString()}
+          <article key={r.id} className="card resource-card">
+            <div className="resource-details">
+              <div className="resource-title-row">
+                <h3>{r.title}</h3>
+                {r.course && <span className="badge">{r.course}</span>}
+              </div>
+              <p className="muted resource-meta">
+                Shared by {r.uploader_id === me.id ? 'you' : r.uploader.full_name} · {new Date(r.uploaded_at).toLocaleDateString()}
               </p>
               {reporting?.id === r.id && (
-                <form className="row reschedule" onSubmit={report}>
+                <form className="row resource-report" onSubmit={report}>
                   <input value={reporting.reason} onChange={(e) => setReporting({ ...reporting, reason: e.target.value })} placeholder="What's wrong? e.g. broken link, spam" aria-label="Reason" required />
                   <button type="submit" className="primary small">
                     Send report
@@ -157,7 +178,7 @@ export default function Resources({ me, showToast }) {
                 </form>
               )}
             </div>
-            <div className="row">
+            <div className="row resource-actions">
               <a className="secondary small button-link" href={r.resource_url} target="_blank" rel="noreferrer">
                 Open ↗
               </a>
