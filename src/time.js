@@ -46,16 +46,50 @@ export function sharedSlots(mine = [], theirs = []) {
   )
 }
 
-// The next date (in local time) that falls on this weekday and time.
-export function nextDateFor(day, hhmm) {
-  const now = new Date()
-  const target = new Date(now)
-  const jsDay = (DAYS.indexOf(day) + 1) % 7 // JS: Sunday = 0
-  target.setDate(now.getDate() + ((jsDay - now.getDay() + 7) % 7))
-  const minutes = toMinutes(hhmm)
-  target.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
-  if (target <= now) target.setDate(target.getDate() + 7)
-  return target
+const pad = (n) => String(n).padStart(2, '0')
+
+// A Date -> '2026-11-10T16:00' in local time: what <input type="datetime-local">
+// uses, and how Set Up Meetup keeps the chosen time in its URL.
+export function toLocalInput(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// 'Mon'..'Sun' for a Date.
+export function weekday(date) {
+  return DAYS[(date.getDay() + 6) % 7] // JS: Sunday = 0
+}
+
+// Whether someone's weekly free times cover `minutes` minutes from `date`.
+export function freeAt(slots = [], date, minutes = 60) {
+  const day = weekday(date)
+  const start = date.getHours() * 60 + date.getMinutes()
+  return slots.some(
+    (s) => s.day_of_week === day && toMinutes(s.start_time) <= start && start + minutes <= toMinutes(s.start_time) + s.duration_minutes,
+  )
+}
+
+// The next 7 days (today first), each with the hours in your free times that
+// haven't started yet, as Dates.
+export function upcomingFreeHours(slots = [], now = new Date()) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
+    const starts = new Set()
+    for (const s of slots) {
+      if (s.day_of_week !== weekday(date)) continue
+      const end = toMinutes(s.start_time) + s.duration_minutes
+      for (let m = toMinutes(s.start_time); m + 60 <= end; m += 60) starts.add(m)
+    }
+    const hours = [...starts]
+      .sort((a, b) => a - b)
+      .map((m) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(m / 60), m % 60))
+      .filter((h) => h > now)
+    return { key: toLocalInput(date).slice(0, 10), date, hours }
+  })
+}
+
+// '4 PM', or '4:30 PM' when it isn't on the hour.
+export function formatHour(date) {
+  return date.toLocaleTimeString(undefined, date.getMinutes() ? { hour: 'numeric', minute: '2-digit' } : { hour: 'numeric' })
 }
 
 // 'Wed, Oct 15 · 3:00 PM'
