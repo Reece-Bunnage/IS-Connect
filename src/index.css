@@ -291,19 +291,43 @@ details.members li > span { flex: 1; }
 .confirm-box { background: #fff7f6; border: 1px solid #f0c6c1; border-radius: 12px; padding: 12px; margin-top: 8px; }
 .resolved { opacity: 0.6; }
 
-/* ---- Availability: the week as one grid you tap or drag across (like When2meet) ---- */
-.avail-grid { display: grid; grid-template-columns: 2.75rem repeat(7, minmax(0, 1fr)); gap: 3px; max-width: 640px; margin: 12px 0 8px; user-select: none; -webkit-user-select: none; }
-.avail-day { padding-bottom: 2px; text-align: center; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
-.avail-hour { align-self: center; padding-right: 6px; text-align: right; white-space: nowrap; font-size: 0.7rem; color: var(--muted); }
-/* touch-action: none so dragging on the grid marks hours instead of scrolling;
-   the page still scrolls from the hour labels and around the grid. */
-.avail-cell { height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; touch-action: none; cursor: pointer; }
-.avail-cell:hover { border-color: var(--green); }
-.avail-cell.on { background: var(--green); border-color: var(--green); }
-.avail-cell:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
-.avail-tools { margin-bottom: 4px; }
-.avail-tools .link { padding: 0; }
+/* ---- Availability: "Weekly hours" (a row per day with From / To times) ---- */
+.availability-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (min-width: 900px) {
+  .availability-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+  .week-preview { position: sticky; top: 16px; }
+}
+.day-list { list-style: none; padding: 0; margin: 8px 0 12px; }
+.day-hours { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.day-hours:first-child { border-top: 0; }
+.day-name { flex: 0 0 8.5rem; display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; }
+.day-name input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--green); cursor: pointer; }
+.day-name label { cursor: pointer; }
+.day-body { flex: 1 1 15rem; min-width: 0; }
+.day-body.off { flex-basis: auto; }
+.day-body.off p { display: flex; align-items: center; min-height: 44px; margin: 0; }
+.time-range { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; }
+.time-range select { flex: 1 1 6rem; min-width: 0; max-width: 10rem; min-height: 44px; }
+.time-range select[aria-invalid] { border-color: var(--error); }
+.range-remove { flex: none; width: 44px; height: 44px; border: 0; border-radius: 10px; background: none; color: var(--muted); font-size: 1.5rem; line-height: 1; }
+.range-remove:hover { background: var(--green-soft); color: var(--text); }
+.range-error { flex-basis: 100%; margin: 0; }
+.range-tools { display: flex; flex-wrap: wrap; gap: 0 20px; }
+.range-tools .link { min-height: 36px; padding: 0; }
+.copy-panel { margin: 8px 0 0; padding: 10px 14px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.copy-panel legend { padding: 0 4px; font-size: 0.9rem; font-weight: 700; }
+.copy-days { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 4px 0 10px; }
+.copy-days .check { min-height: 36px; }
+.copy-days input { width: 18px; height: 18px; accent-color: var(--green); }
 .unsaved { color: #8a4b0f; }
+/* The read-only week picture. */
+.week-preview h2 { font-size: 1rem; }
+.preview-grid { display: grid; grid-template-columns: 2.6rem repeat(7, minmax(0, 1fr)); column-gap: 3px; margin-top: 8px; }
+.preview-day { padding-bottom: 4px; text-align: center; white-space: nowrap; font-size: 0.68rem; font-weight: 700; color: var(--muted); }
+.preview-hour { padding-right: 6px; text-align: right; font-size: 0.66rem; line-height: 8px; color: var(--muted); white-space: nowrap; }
+.preview-cell { height: 8px; background: var(--bg); }
+.preview-cell.hour-start { border-top: 1px solid #fff; }
+.preview-cell.on { background: var(--green); }
 
 /* ---- Set up a meetup: pick a time first ---- */
 .spaced-sm { margin-top: 10px; }

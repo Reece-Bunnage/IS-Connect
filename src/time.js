@@ -24,6 +24,40 @@ export function formatSlot(slot) {
   return `${slot.day_of_week} ${formatTime(slot.start_time)}`
 }
 
+// Minutes after midnight -> '9:30 AM'. 1440 (midnight, as an end time) -> '12:00 AM'.
+export function formatMinutes(m) {
+  return formatTime(toHHMM(m % 1440))
+}
+
+// [start, end] minute ranges that overlap or touch -> merged and sorted.
+export function mergeRanges(ranges) {
+  const merged = []
+  for (const [start, end] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    const last = merged.at(-1)
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end)
+    else merged.push([start, end])
+  }
+  return merged
+}
+
+// Weekly slots -> { Mon: [[540, 720], ...], ... }: each day's free times as
+// merged minute ranges (so back-to-back 1-hour blocks become one range).
+export function rangesByDay(slots = []) {
+  const byDay = Object.fromEntries(DAYS.map((d) => [d, []]))
+  for (const s of slots) {
+    const start = toMinutes(s.start_time)
+    byDay[s.day_of_week]?.push([start, start + s.duration_minutes])
+  }
+  for (const d of DAYS) byDay[d] = mergeRanges(byDay[d])
+  return byDay
+}
+
+// 'Mon 9:00 AM – 12:00 PM, Wed 1:00 PM – 4:00 PM'
+export function formatWeek(slots = []) {
+  const byDay = rangesByDay(slots)
+  return DAYS.flatMap((d) => byDay[d].map(([s, e]) => `${d} ${formatMinutes(s)} – ${formatMinutes(e)}`)).join(', ')
+}
+
 // Times both students are free (at least 30 minutes), sorted Mon -> Sun.
 export function sharedSlots(mine = [], theirs = []) {
   const shared = new Map()
