@@ -97,7 +97,7 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
               </div>
             </div>
           )}
-          {m.my_feedback === 'great' && <ConfidenceSummary survey={surveys.data.find((s) => s.meetup_id === m.id)} />}{end.getTime() <= now &&
+          {end.getTime() <= now &&
   ['confirmed', 'completed'].includes(m.status) &&
   m.my_feedback !== 'no_show' && (
     <ConfidenceSurvey
