@@ -1,4 +1,5 @@
 // Small pieces shared by several screens.
+import { useEffect, useRef } from 'react'
 
 export const NAV = [
   { id: 'home', icon: 'home', label: 'Home' },
@@ -145,10 +146,10 @@ export function DemoBadge({ student }) {
   )
 }
 
-export function PageHeader({ title, text }) {
+export function PageHeader({ title, text, className = '' }) {
   return (
-    <header className="page-header">
-      <p className="eyebrow">Your IS community</p>
+    <header className={`page-header ${className}`}>
+      <p className="eyebrow">Your I.S. community</p>
       <h1>{title}</h1>
       {text && <p className="muted">{text}</p>}
     </header>
@@ -249,4 +250,127 @@ export async function inviteClassmate() {
   } catch {
     return `Share this link: ${url}`
   }
+}
+
+// A ⋯ button with a small menu of less-used or risky actions. It closes after
+// a choice, when you tap elsewhere, or on Escape (focus goes back to ⋯).
+export function MoreMenu({ label, children }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    const onPointerDown = (e) => el.open && !el.contains(e.target) && (el.open = false)
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && el.open) {
+        el.open = false
+        el.querySelector('summary').focus()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('keydown', onKeyDown)
+    }
+  }, [])
+  return (
+    <details className="more" ref={ref}>
+      <summary aria-label={label}>⋯</summary>
+      <div className="menu" onClick={(e) => e.target.closest('button') && (ref.current.open = false)}>
+        {children}
+      </div>
+    </details>
+  )
+}
+
+// The slim bar at the top of an open chat, like a messaging app: back to the
+// list (phones only; on desktop the list is beside the chat), who or what the
+// chat is, then actions.
+export function ChatBar({ onBack, backLabel, icon, title, subtitle, children }) {
+  return (
+    <div className="chat-bar">
+      <button type="button" className="chat-back back-to-list" aria-label={backLabel} onClick={onBack}>
+        ‹
+      </button>
+      {icon}
+      <div className="chat-bar-text">
+        <h2>{title}</h2>
+        {subtitle && <div className="chat-bar-sub">{subtitle}</div>}
+      </div>
+      <div className="chat-bar-actions">{children}</div>
+    </div>
+  )
+}
+
+// Whether a student has anything for ProfileDetails to show.
+export function hasProfileDetails(s) {
+  return Boolean(s.bio || s.ask_me_about || s.student_courses?.length || s.student_skills?.length || s.student_needs?.length)
+}
+
+// A student's bio, "Ask me about", classes, strengths and needs.
+export function ProfileDetails({ student: s }) {
+  const classes = (s.student_courses ?? []).map((c) => c.courses.code).sort()
+  const strengths = (s.student_skills ?? []).map((k) => k.skills.name)
+  const needs = (s.student_needs ?? []).map((n) => n.skills.name)
+  return (
+    <div className="profile-details">
+      {s.bio && <p>{s.bio}</p>}
+      {s.ask_me_about && (
+        <p>
+          <strong>Ask me about:</strong> {s.ask_me_about}
+        </p>
+      )}
+      <dl className="person-facts">
+        {classes.length > 0 && (
+          <>
+            <dt>Classes</dt>
+            <dd>{classes.join(' · ')}</dd>
+          </>
+        )}
+        {strengths.length > 0 && (
+          <>
+            <dt>Strong in</dt>
+            <dd className="chips">
+              {strengths.map((name) => (
+                <span key={name} className="chip on">
+                  {name}
+                </span>
+              ))}
+            </dd>
+          </>
+        )}
+        {needs.length > 0 && (
+          <>
+            <dt>Wants help with</dt>
+            <dd className="chips">
+              {needs.map((name) => (
+                <span key={name} className="chip need on">
+                  {name}
+                </span>
+              ))}
+            </dd>
+          </>
+        )}
+      </dl>
+    </div>
+  )
+}
+
+// A centered pop-up (native <dialog>: Esc closes it, focus stays inside).
+// Tapping the dark area around it closes it too.
+export function Dialog({ dialogRef, title, titleId, onClose, children }) {
+  return (
+    <dialog ref={dialogRef} className="app-dialog" aria-labelledby={titleId} onClose={onClose} onClick={(e) => e.target === e.currentTarget && e.currentTarget.close()}>
+      <div className="app-dialog-body">
+        <div className="survey-dialog-head">
+          <div className="app-dialog-title" id={titleId}>
+            {title}
+          </div>
+          <button type="button" className="close-button" aria-label="Close" onClick={() => dialogRef.current.close()}>
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </dialog>
+  )
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { ActiveDot, Avatar, DemoBadge, PageHeader, inviteClassmate, programLabel } from '../ui.jsx'
+import { ActiveDot, Avatar, DemoBadge, MoreMenu, PageHeader, ProfileDetails, hasProfileDetails, inviteClassmate, programLabel } from '../ui.jsx'
 
 export default function FindFriends({ go, me, params, showToast, refreshCounts }) {
   const [search, setSearch] = useState('')
@@ -157,16 +157,12 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     return (
       <div className="row actions">
         {main}
-        <details className="more">
-          <summary aria-label={`More actions for ${s.full_name}`}>⋯</summary>
-          {/* Picking something closes the menu. */}
-          <div className="menu" onClick={(e) => e.target.closest('button') && (e.currentTarget.parentElement.open = false)}>
-            {menu}
-            <button className="danger" onClick={() => go('blockReport', { studentId: s.id })}>
-              Block or report
-            </button>
-          </div>
-        </details>
+        <MoreMenu label={`More actions for ${s.full_name}`}>
+          {menu}
+          <button className="danger" onClick={() => go('blockReport', { studentId: s.id })}>
+            Block or report
+          </button>
+        </MoreMenu>
       </div>
     )
   }
@@ -325,51 +321,11 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
 
 // Everything else about a student, folded away so the list stays scannable.
 function MoreAbout({ student: s }) {
-  const classes = s.student_courses.map((c) => c.courses.code).sort()
-  const strengths = s.student_skills.map((k) => k.skills.name)
-  const needs = s.student_needs.map((n) => n.skills.name)
-  if (!s.bio && !s.ask_me_about && !classes.length && !strengths.length && !needs.length) return null
+  if (!hasProfileDetails(s)) return null
   return (
     <details className="person-more">
       <summary>More about {s.full_name.split(' ')[0]}</summary>
-      {s.bio && <p>{s.bio}</p>}
-      {s.ask_me_about && (
-        <p>
-          <strong>Ask me about:</strong> {s.ask_me_about}
-        </p>
-      )}
-      <dl className="person-facts">
-        {classes.length > 0 && (
-          <>
-            <dt>Classes</dt>
-            <dd>{classes.join(' · ')}</dd>
-          </>
-        )}
-        {strengths.length > 0 && (
-          <>
-            <dt>Strong in</dt>
-            <dd className="chips">
-              {strengths.map((name) => (
-                <span key={name} className="chip on">
-                  {name}
-                </span>
-              ))}
-            </dd>
-          </>
-        )}
-        {needs.length > 0 && (
-          <>
-            <dt>Wants help with</dt>
-            <dd className="chips">
-              {needs.map((name) => (
-                <span key={name} className="chip need on">
-                  {name}
-                </span>
-              ))}
-            </dd>
-          </>
-        )}
-      </dl>
+      <ProfileDetails student={s} />
     </details>
   )
 }

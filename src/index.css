@@ -150,8 +150,20 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .convo-text .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .new-chat { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
 .chat { flex-direction: column; gap: 10px; margin: 0; min-height: 420px; }
-.chat-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.chat-header h2 { margin: 0; }
+/* The slim bar at the top of an open chat: ‹ · photo · name / status · actions. */
+.chat-bar { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.chat-back { flex: none; width: 36px; height: 44px; margin-left: -8px; border: 0; border-radius: 10px; background: none; color: var(--green); font-size: 2rem; line-height: 1; }
+.chat-back:hover { background: var(--green-soft); }
+.chat-bar .avatar, .chat-bar .group-icon { flex: none; }
+.chat-bar-text { flex: 1; min-width: 0; }
+.chat-bar-text h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.chat-bar-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-height: 1.1em; color: var(--muted); font-size: 0.78rem; }
+.chat-bar-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.chat-bar-actions .small { margin: 0; }
+/* Hidden on phones only: e.g. a page intro while a chat is open. */
+@media (max-width: 899px) {
+  .hide-on-phone { display: none; }
+}
 .bubbles { flex: 1; display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow-y: auto; padding: 4px 0; }
 .bubble { align-self: flex-start; max-width: 80%; background: var(--green-soft); border-radius: 14px 14px 14px 4px; padding: 8px 12px; margin: 0; overflow-wrap: anywhere; }
 .bubble.mine { align-self: flex-end; background: var(--green); color: #fff; border-radius: 14px 14px 4px 14px; }
@@ -291,11 +303,9 @@ details.more .menu button.danger { color: var(--error); }
 .group-msg { display: flex; gap: 8px; align-items: flex-end; }
 .group-msg.mine { justify-content: flex-end; }
 .bubble-name { display: block; font-size: 0.75rem; font-weight: 700; color: var(--green); }
-details.members { border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; }
-details.members summary { cursor: pointer; font-weight: 600; }
-details.members ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
-details.members li { display: flex; align-items: center; gap: 8px; }
-details.members li > span { flex: 1; }
+.member-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.member-list li { display: flex; align-items: center; gap: 10px; }
+.member-list li > span { flex: 1; min-width: 0; }
 
 /* Notifications, meetups, safety, reports */
 .notification { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
@@ -511,7 +521,7 @@ details.others { margin-top: 16px; }
 .confidence-saved .survey-notes { margin-top: 4px; }
 .confidence-saved .link { padding: 0 4px; }
 
-.survey-dialog {
+.survey-dialog, .app-dialog {
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
@@ -523,9 +533,13 @@ details.others { margin-top: 16px; }
   color: var(--text);
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
 }
-.survey-dialog::backdrop { background: rgb(31 45 39 / 0.45); }
+.survey-dialog::backdrop, .app-dialog::backdrop { background: rgb(31 45 39 / 0.45); }
+.app-dialog-body { padding: 20px; }
+.app-dialog-title { min-width: 0; }
+.app-dialog-title h2 { margin: 0; }
+.app-dialog .profile-details { margin-top: 8px; }
 /* Keep the page behind the pop-up from scrolling. */
-body:has(.survey-dialog[open]) { overflow: hidden; }
+body:has(.survey-dialog[open]), body:has(.app-dialog[open]) { overflow: hidden; }
 .survey-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .close-button { flex: none; border: 0; background: none; color: var(--muted); font-size: 1.6rem; line-height: 1; padding: 2px 8px; border-radius: 8px; }
 .close-button:hover { background: var(--green-soft); }
