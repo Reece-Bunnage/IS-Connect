@@ -99,8 +99,11 @@ code { font-size: 0.8rem; word-break: break-all; }
 .content { min-width: 0; }
 
 /* ---- Shared bits ---- */
-.page-header { margin-bottom: 14px; }
+/* Clear space between a page's intro and its content, so you can take in
+   what the page is for before the details start. */
+.page-header { margin-bottom: 28px; }
 .page-header h1 { font-size: 1.9rem; letter-spacing: -0.01em; }
+.page-header .muted { max-width: 60ch; }
 .spaced { margin-top: 20px; }
 .empty { text-align: center; padding: 32px 18px; }
 .notice-card { background: var(--notice); border-color: #efe2c4; }
@@ -331,12 +334,16 @@ details.members li > span { flex: 1; }
 
 /* ---- Set up a meetup: pick a time first ---- */
 .spaced-sm { margin-top: 10px; }
+.steps-bar { margin: 0 0 20px; }
+.search-by-name { margin-top: 20px; }
+.search-by-name summary { padding: 10px 0; cursor: pointer; color: var(--green); font-weight: 600; }
+.search-by-name[open] summary { margin-bottom: 4px; }
 .picked { display: flex; align-items: center; gap: 12px; }
 .picked + .picked { margin-top: 10px; }
 .picked-icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green); }
 .picked-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* Phone: a strip of 7 days, and only the chosen day's hours. */
-.day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 12px 0; }
+.day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 16px 0; }
 .day-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600; }
 .day-tab strong { font-size: 1.1rem; }
 .day-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 0.72rem; font-weight: 700; line-height: 18px; }

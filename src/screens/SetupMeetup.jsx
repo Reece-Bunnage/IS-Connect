@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
@@ -237,7 +237,7 @@ function withContactRules(people, all, meId, friendships, inbox) {
 function Steps({ stage, partner }) {
   const index = STEPS.findIndex(([id]) => id === stage)
   return (
-    <ol className="stepper" aria-label="Steps">
+    <ol className="stepper steps-bar" aria-label="Steps">
       {STEPS.map(([id, label], i) => (
         <li key={id} className={i === index ? 'on' : i < index || (id === 'who' && partner) ? 'done' : ''} aria-current={i === index ? 'step' : undefined}>
           <span>{i + 1}</span> {label}
@@ -402,22 +402,28 @@ function WhenStep({ go, open, mySlots, partner, invitable }) {
 }
 
 // For when you already know who: pick them first, then a time you're both free.
+// Folded away as one link until you need it, so the time picker is the one
+// thing on the page asking for attention.
 function SearchByName({ invitable, open }) {
   const [query, setQuery] = useState('')
+  const input = useRef(null)
   const q = query.trim().toLowerCase()
   const matches = q
     ? invitable.filter((s) => s.full_name.toLowerCase().includes(q) || s.student_courses.some((c) => c.courses.code.toLowerCase().includes(q)))
     : []
   return (
-    <section className="card form">
-      <label>
-        Already know who?
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or class" />
-      </label>
-      {q && matches.length === 0 && <p className="muted">No one you can invite matches “{query.trim()}”.</p>}
-      {matches.length > 0 && <PersonList people={matches.slice(0, 8)} onPick={(s) => open({ partnerId: s.id })} />}
-      {matches.length > 8 && <p className="muted small-text">Keep typing to narrow it down.</p>}
-    </section>
+    <details className="search-by-name" onToggle={(e) => e.currentTarget.open && input.current?.focus()}>
+      <summary>Already know who? Search by name</summary>
+      <section className="card form">
+        <label>
+          Name or class
+          <input ref={input} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. Daniel or IS 303" />
+        </label>
+        {q && matches.length === 0 && <p className="muted">No one you can invite matches “{query.trim()}”.</p>}
+        {matches.length > 0 && <PersonList people={matches.slice(0, 8)} onPick={(s) => open({ partnerId: s.id })} />}
+        {matches.length > 8 && <p className="muted small-text">Keep typing to narrow it down.</p>}
+      </section>
+    </details>
   )
 }
 
