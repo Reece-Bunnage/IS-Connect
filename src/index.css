@@ -125,7 +125,6 @@ textarea { font: inherit; resize: vertical; }
 .segmented button.on { background: var(--green); border-color: var(--green); color: #fff; }
 .segmented button.on .count { background: #fff; color: var(--green); }
 button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--text); }
-.hours { margin: 12px 0 4px; }
 
 /* ---- Messages ---- */
 /* minmax(0, …) lets columns shrink to the screen; plain 1fr grows to fit the
@@ -291,6 +290,20 @@ details.members li > span { flex: 1; }
 .radio-card input { margin-top: 4px; }
 .confirm-box { background: #fff7f6; border: 1px solid #f0c6c1; border-radius: 12px; padding: 12px; margin-top: 8px; }
 .resolved { opacity: 0.6; }
+
+/* ---- Availability: the week as one grid you tap or drag across (like When2meet) ---- */
+.avail-grid { display: grid; grid-template-columns: 2.75rem repeat(7, minmax(0, 1fr)); gap: 3px; max-width: 640px; margin: 12px 0 8px; user-select: none; -webkit-user-select: none; }
+.avail-day { padding-bottom: 2px; text-align: center; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.avail-hour { align-self: center; padding-right: 6px; text-align: right; white-space: nowrap; font-size: 0.7rem; color: var(--muted); }
+/* touch-action: none so dragging on the grid marks hours instead of scrolling;
+   the page still scrolls from the hour labels and around the grid. */
+.avail-cell { height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; touch-action: none; cursor: pointer; }
+.avail-cell:hover { border-color: var(--green); }
+.avail-cell.on { background: var(--green); border-color: var(--green); }
+.avail-cell:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.avail-tools { margin-bottom: 4px; }
+.avail-tools .link { padding: 0; }
+.unsaved { color: #8a4b0f; }
 
 /* ---- Set up a meetup: pick a time first ---- */
 .spaced-sm { margin-top: 10px; }
