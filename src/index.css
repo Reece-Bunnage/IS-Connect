@@ -151,7 +151,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .new-chat { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
 .chat { flex-direction: column; gap: 10px; margin: 0; min-height: 420px; }
 /* The slim bar at the top of an open chat: ‹ · photo · name / status · actions. */
-.chat-bar { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.chat-bar { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
 .chat-back { flex: none; width: 36px; height: 44px; margin-left: -8px; border: 0; border-radius: 10px; background: none; color: var(--green); font-size: 2rem; line-height: 1; }
 .chat-back:hover { background: var(--green-soft); }
 .chat-bar .avatar, .chat-bar .group-icon { flex: none; }
