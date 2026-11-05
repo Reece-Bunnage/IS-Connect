@@ -94,13 +94,28 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     setJoining(false)
   }
 
-  function primaryAction(s) {
+  // The buttons people actually use sit on the card. Only rarely used or risky
+  // actions (Remove friend, Block or report) are tucked into the ⋯ menu.
+  function actions(s) {
     const f = s.friendship
     const busy = busyId === s.id
+    const first = s.full_name.split(' ')[0]
+    const message = (className) => (
+      <button className={className} aria-label={`Message ${first}`} onClick={() => go('messages', { studentId: s.id })}>
+        Message
+      </button>
+    )
+    const schedule = (
+      <button className="secondary small" aria-label={`Schedule a meetup with ${first}`} onClick={() => go('setupMeetup', { partnerId: s.id })}>
+        Schedule
+      </button>
+    )
+    let main
+    let menu
     if (f?.status === 'pending' && f.incoming) {
-      return (
+      main = (
         <>
-          <button className="primary small" disabled={busy} onClick={() => act(s.id, 'respond_friend', { p_friendship_id: f.id, p_accept: true }, `You and ${s.full_name.split(' ')[0]} are now friends.`)}>
+          <button className="primary small" disabled={busy} onClick={() => act(s.id, 'respond_friend', { p_friendship_id: f.id, p_accept: true }, `You and ${first} are now friends.`)}>
             Accept friend
           </button>
           <button className="secondary small" disabled={busy} onClick={() => act(s.id, 'respond_friend', { p_friendship_id: f.id, p_accept: false })}>
@@ -108,25 +123,51 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
           </button>
         </>
       )
-    }
-    if (f?.status === 'accepted') {
-      return (
-        <button className="primary small" onClick={() => go('messages', { studentId: s.id })}>
-          Message
-        </button>
+      menu = (
+        <>
+          <button onClick={() => go('messages', { studentId: s.id })}>Message</button>
+          <button onClick={() => go('setupMeetup', { partnerId: s.id })}>Schedule a meetup</button>
+        </>
       )
-    }
-    if (f?.status === 'pending') {
-      return (
-        <button className="secondary small" disabled>
-          Request sent
-        </button>
+    } else if (f?.status === 'accepted') {
+      main = (
+        <>
+          {message('primary small')}
+          {schedule}
+        </>
       )
+      menu = <button onClick={() => act(s.id, 'remove_friend', { p_other_id: s.id }, `Removed ${first} from your friends.`)}>Remove friend</button>
+    } else {
+      main = (
+        <>
+          {f?.status === 'pending' ? (
+            <button className="secondary small" disabled>
+              Request sent
+            </button>
+          ) : (
+            <button className="primary small" disabled={busy} onClick={() => act(s.id, 'add_friend', { p_other_id: s.id }, `Friend request sent to ${first}.`)}>
+              + Add friend
+            </button>
+          )}
+          {schedule}
+        </>
+      )
+      menu = <button onClick={() => go('messages', { studentId: s.id })}>Message</button>
     }
     return (
-      <button className="primary small" disabled={busy} onClick={() => act(s.id, 'add_friend', { p_other_id: s.id }, `Friend request sent to ${s.full_name.split(' ')[0]}.`)}>
-        + Add friend
-      </button>
+      <div className="row actions">
+        {main}
+        <details className="more">
+          <summary aria-label={`More actions for ${s.full_name}`}>⋯</summary>
+          {/* Picking something closes the menu. */}
+          <div className="menu" onClick={(e) => e.target.closest('button') && (e.currentTarget.parentElement.open = false)}>
+            {menu}
+            <button className="danger" onClick={() => go('blockReport', { studentId: s.id })}>
+              Block or report
+            </button>
+          </div>
+        </details>
+      </div>
     )
   }
 
@@ -241,57 +282,94 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
         </section>
       )}
 
-      <div className="list">
-        {shown.map((s) => (
-          <article key={s.id} className="card person">
-            <Avatar name={s.full_name} color={s.avatar_color} />
-            <div className="person-body">
-              <h3>
-                {s.full_name} <span className={`badge ${s.program_status}`}>{programLabel(s.program_status)}</span> <DemoBadge student={s} />{' '}
-                <ActiveDot lastActive={s.last_active_at} />
-              </h3>
-              {s.student_courses.length > 0 && <p className="muted">{s.student_courses.map((c) => c.courses.code).sort().join(' · ')}</p>}
-              {s.reasons.length > 0 && <p className="why">✨ {s.reasons.join(' · ')}</p>}
-              {s.bio && <p>{s.bio}</p>}
-              {s.ask_me_about && (
-                <p>
-                  <strong>Ask me about:</strong> {s.ask_me_about}
-                </p>
+      <div className="people-list">
+        {shown.map((s) => {
+          const strengths = s.student_skills.map((k) => k.skills.name)
+          return (
+            <article key={s.id} className="card person-card">
+              <div className="person-head">
+                <Avatar name={s.full_name} color={s.avatar_color} />
+                <div className="person-head-text">
+                  <h3>
+                    {s.full_name} <DemoBadge student={s} />
+                  </h3>
+                  <p className="person-meta">
+                    <span className={`badge ${s.program_status}`}>{programLabel(s.program_status)}</span>
+                    <ActiveDot lastActive={s.last_active_at} />
+                  </p>
+                </div>
+              </div>
+              {s.reasons.length > 0 && <p className="why">✨ {s.reasons.slice(0, 2).join(' · ')}</p>}
+              {strengths.length > 0 && (
+                <div className="chips">
+                  <span className="sr-only">Strong in: </span>
+                  {strengths.slice(0, 3).map((name) => (
+                    <span key={name} className="chip on">
+                      {name}
+                    </span>
+                  ))}
+                  {strengths.length > 3 && <span className="chip more-count">+{strengths.length - 3} more</span>}
+                </div>
               )}
-              <div className="chips">
-                {s.student_skills.map((k) => (
-                  <span key={`s${k.skill_id}`} className="chip on">
-                    {k.skills.name}
-                  </span>
-                ))}
-                {s.student_needs.map((n) => (
-                  <span key={`n${n.skill_id}`} className="chip need on" title="Wants help with">
-                    Needs {n.skills.name}
-                  </span>
-                ))}
-              </div>
-              <div className="row actions">
-                {primaryAction(s)}
-                <details className="more">
-                  <summary aria-label={`More actions for ${s.full_name}`}>⋯</summary>
-                  <div className="menu">
-                    {s.friendship?.status !== 'accepted' && <button onClick={() => go('messages', { studentId: s.id })}>Message</button>}
-                    <button onClick={() => go('setupMeetup', { partnerId: s.id })}>Schedule a meetup</button>
-                    {s.friendship?.status === 'accepted' && (
-                      <button onClick={() => act(s.id, 'remove_friend', { p_other_id: s.id }, `Removed ${s.full_name.split(' ')[0]} from your friends.`)}>Remove friend</button>
-                    )}
-                    <button className="danger" onClick={() => go('blockReport', { studentId: s.id })}>
-                      Block or report
-                    </button>
-                  </div>
-                </details>
-              </div>
-            </div>
-          </article>
-        ))}
+              {actions(s)}
+              <MoreAbout student={s} />
+            </article>
+          )
+        })}
       </div>
 
       {cantFind}
     </>
+  )
+}
+
+// Everything else about a student, folded away so the list stays scannable.
+function MoreAbout({ student: s }) {
+  const classes = s.student_courses.map((c) => c.courses.code).sort()
+  const strengths = s.student_skills.map((k) => k.skills.name)
+  const needs = s.student_needs.map((n) => n.skills.name)
+  if (!s.bio && !s.ask_me_about && !classes.length && !strengths.length && !needs.length) return null
+  return (
+    <details className="person-more">
+      <summary>More about {s.full_name.split(' ')[0]}</summary>
+      {s.bio && <p>{s.bio}</p>}
+      {s.ask_me_about && (
+        <p>
+          <strong>Ask me about:</strong> {s.ask_me_about}
+        </p>
+      )}
+      <dl className="person-facts">
+        {classes.length > 0 && (
+          <>
+            <dt>Classes</dt>
+            <dd>{classes.join(' · ')}</dd>
+          </>
+        )}
+        {strengths.length > 0 && (
+          <>
+            <dt>Strong in</dt>
+            <dd className="chips">
+              {strengths.map((name) => (
+                <span key={name} className="chip on">
+                  {name}
+                </span>
+              ))}
+            </dd>
+          </>
+        )}
+        {needs.length > 0 && (
+          <>
+            <dt>Wants help with</dt>
+            <dd className="chips">
+              {needs.map((name) => (
+                <span key={name} className="chip need on">
+                  {name}
+                </span>
+              ))}
+            </dd>
+          </>
+        )}
+      </dl>
+    </details>
   )
 }

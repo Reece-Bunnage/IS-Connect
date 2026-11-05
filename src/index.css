@@ -254,6 +254,26 @@ details.more .menu { position: absolute; z-index: 10; top: calc(100% + 4px); rig
 details.more .menu button { text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; color: var(--text); font: inherit; }
 details.more .menu button:hover { background: var(--green-soft); }
 details.more .menu button.danger { color: var(--error); }
+/* Compact person cards: who they are, why you match, top strengths, and the
+   main actions; the rest folds into "More about". Two columns on desktop. */
+.people-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.people-list > .card { margin: 0; }
+@media (min-width: 900px) {
+  .people-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.person-card { display: flex; flex-direction: column; gap: 10px; }
+.person-head { display: flex; align-items: center; gap: 12px; }
+.person-head-text { min-width: 0; }
+.person-head h3 { margin: 0; }
+.person-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 2px 0 0; }
+.person-card .why { margin: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.person-card > .chips, .person-card .actions { margin: 0; }
+.chip.more-count { background: none; border-style: dashed; color: var(--muted); }
+.person-more summary { padding: 4px 0; cursor: pointer; color: var(--green); font-size: 0.9rem; font-weight: 600; }
+.person-more p { margin: 8px 0; }
+.person-facts { margin: 8px 0 0; }
+.person-facts dt { margin-top: 12px; color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.person-facts dd { margin: 4px 0 0; }
 .match-card { background: var(--green-soft); border-color: #c5d8ca; margin-top: 16px; }
 .match-card select { flex: 1; min-width: 200px; }
 .match-card .primary { margin-top: 0; }
