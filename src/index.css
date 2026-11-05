@@ -465,6 +465,12 @@ body:has(.survey-dialog[open]) { overflow: hidden; }
 .survey-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .close-button { flex: none; border: 0; background: none; color: var(--muted); font-size: 1.6rem; line-height: 1; padding: 2px 8px; border-radius: 8px; }
 .close-button:hover { background: var(--green-soft); }
+/* A card title with a close (×) button on the right. */
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.card-head .close-button { margin: -4px -8px 0 0; }
+.calendar-mini { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 16px; }
+.calendar-mini .icon { color: var(--green); }
+.calendar-mini .link { padding: 0; }
 .survey-dialog-actions { margin-top: 4px; }
 
 .confidence-survey {

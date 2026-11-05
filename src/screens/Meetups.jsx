@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { rpc, useRpc } from '../api.js'
 import { formatWhen, googleCalendarLink } from '../time.js'
-import { Avatar, PageHeader } from '../ui.jsx'
+import { Avatar, Icon, PageHeader } from '../ui.jsx'
 import ConfidenceSurvey, { ConfidenceSummary } from './ConfidenceSurvey.jsx'
 
 const STATUS_LABEL = {
@@ -199,13 +199,48 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
 
 // A private link that Google Calendar (or Apple Calendar / Outlook) subscribes to.
 // Served by the Edge Function in supabase/functions/calendar.
+// Whether you closed the calendar card with ×, remembered in this browser.
+function useHiddenCard(key) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1'
+    } catch {
+      return false
+    }
+  })
+  function set(value) {
+    setHidden(value)
+    try {
+      if (value) localStorage.setItem(key, '1')
+      else localStorage.removeItem(key)
+    } catch {
+      // Storage unavailable: it stays hidden until the page reloads.
+    }
+  }
+  return [hidden, set]
+}
+
 function CalendarLink({ me, showToast }) {
   const feed = useRpc('my_calendar_feed', {}, [me.id])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [confirming, setConfirming] = useState(null) // 'reset' | 'off'
+  const [hidden, setHidden] = useHiddenCard(`is-connect-hide-calendar-card-${me.id}`)
 
   if (!feed.data) return feed.error ? <p className="error">Could not load your calendar link: {feed.error}</p> : null
+
+  // Closed with ×: one line, so Reset / Turn off stay reachable.
+  if (hidden) {
+    return (
+      <p className="calendar-mini muted small-text">
+        <Icon name="calendar" size={16} />
+        {feed.data.token ? 'Calendar link is on.' : 'Want your meetups in Google Calendar?'}
+        <button className="link small" onClick={() => setHidden(false)}>
+          {feed.data.token ? 'Calendar settings' : 'Set it up'}
+        </button>
+      </p>
+    )
+  }
 
   const { token, last_fetched_at: lastChecked } = feed.data
   const url = token && `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calendar/${token}.ics`
@@ -237,7 +272,12 @@ function CalendarLink({ me, showToast }) {
 
   return (
     <section className="card calendar-link">
-      <h2>See your meetups in Google Calendar</h2>
+      <div className="card-head">
+        <h2>See your meetups in Google Calendar</h2>
+        <button className="close-button" aria-label="Hide calendar link card" title="Hide" onClick={() => setHidden(true)}>
+          ×
+        </button>
+      </div>
       <p className="muted">
         Subscribe once and your meetups show up by themselves. Requests say "Pending" until they're confirmed, new times move the event, and
         cancelled meetups disappear.
