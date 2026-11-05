@@ -18,7 +18,7 @@ function icebreakers(me, other) {
 
 // Inbox (Chats / Requests) + one open chat (params.studentId). On a phone
 // only one shows at a time; on a wide screen they sit side by side.
-export default function Messages({ go, me, params, refreshCounts }) {
+export default function Messages({ go, back, me, params, refreshCounts }) {
   const selectedId = params.studentId
   const [tab, setTab] = useState(params.tab ?? 'chats')
   const [draft, setDraft] = useState('')
@@ -83,7 +83,7 @@ export default function Messages({ go, me, params, refreshCounts }) {
       await rpc('respond_message_request', { p_other_id: selectedId, p_accept: accept })
       await Promise.all([chat.reload(), inbox.reload()])
       refreshCounts()
-      if (!accept) go('messages', { tab: 'requests' })
+      if (!accept) go('messages', { tab: 'requests' }, { replace: true })
     } catch (err) {
       setSendError(err.message)
     }
@@ -147,7 +147,7 @@ export default function Messages({ go, me, params, refreshCounts }) {
           {selectedId && c && (
             <>
               <div className="chat-header">
-                <button className="link back-to-list" onClick={() => go('messages', { tab })}>
+                <button className="link back-to-list" onClick={() => back('messages', { tab })}>
                   ← Chats
                 </button>
                 <div>

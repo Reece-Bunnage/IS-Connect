@@ -4,8 +4,9 @@ import { ActiveDot, Avatar, DemoBadge, PageHeader } from '../ui.jsx'
 
 // Study groups: one per class (you're in the groups for your classes) plus
 // groups made by "Can't find anyone?" matching. List + chat, like Messages.
-export default function Groups({ go, me, params, refreshCounts, showToast }) {
-  const selectedId = params.groupId
+export default function Groups({ go, back, me, params, refreshCounts, showToast }) {
+  // Group ids are numbers; the URL gives them back as text.
+  const selectedId = params.groupId ? Number(params.groupId) : undefined
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -50,7 +51,7 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
       await rpc('leave_group', { p_group_id: selectedId })
       showToast({ text: `You left ${g.name}.` })
       await groups.reload()
-      go('groups')
+      go('groups', {}, { replace: true })
     } catch (err) {
       setError(err.message)
     }
@@ -95,7 +96,7 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
           {selectedId && g && (
             <>
               <div className="chat-header">
-                <button className="link back-to-list" onClick={() => go('groups')}>
+                <button className="link back-to-list" onClick={() => back('groups')}>
                   ← Groups
                 </button>
                 <div>

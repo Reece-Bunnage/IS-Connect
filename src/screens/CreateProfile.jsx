@@ -59,7 +59,7 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
       await rpc('save_profile', { p_profile: { ...form, graduation_year: form.graduation_year || null } })
       // 3-4. Re-read the profile from the database and show it.
       await onSaved()
-      go(isNew ? 'home' : 'myProfile')
+      go(isNew ? 'home' : 'myProfile', {}, { replace: true })
     } catch (err) {
       setError(err.message)
       setSaving(false)

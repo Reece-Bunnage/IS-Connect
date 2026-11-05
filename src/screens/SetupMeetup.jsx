@@ -62,7 +62,7 @@ export default function SetupMeetup({ go, me, params }) {
         p_topic: topic,
         p_location: where,
       })
-      go('meetups')
+      go('meetups', {}, { replace: true })
     } catch (err) {
       setError(err.message)
       setSending(false)
