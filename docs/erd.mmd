@@ -18,6 +18,8 @@ erDiagram
     students ||--o{ messages : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ message_requests : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ meetups : "1-to-many: requests / is partner (2 FKs)"
+    meetups ||--o{ meetup_surveys : "1-to-many: rated in (one per student)"
+    students ||--o{ meetup_surveys : "1-to-many: fills in"
     students ||--o{ user_blocks : "1-to-many: blocks / is blocked (2 FKs)"
     students ||--o{ reports : "1-to-many: reports / is reported"
     study_resources ||--o{ reports : "1-to-many: is reported"
@@ -137,6 +139,15 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         int revision "bumped on every change"
+    }
+    meetup_surveys {
+        bigint meetup_id PK, FK
+        uuid student_id PK, FK
+        int confidence_before "1-5"
+        int confidence_after "1-5"
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
     }
     calendar_feeds {
         uuid token PK "secret in the calendar link"

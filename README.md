@@ -30,6 +30,8 @@ erDiagram
     students ||--o{ messages : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ message_requests : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ meetups : "1-to-many: requests / is partner (2 FKs)"
+    meetups ||--o{ meetup_surveys : "1-to-many: rated in (one per student)"
+    students ||--o{ meetup_surveys : "1-to-many: fills in"
     students ||--o{ user_blocks : "1-to-many: blocks / is blocked (2 FKs)"
     students ||--o{ reports : "1-to-many: reports / is reported"
     study_resources ||--o{ reports : "1-to-many: is reported"
@@ -150,6 +152,15 @@ erDiagram
         timestamptz updated_at
         int revision "bumped on every change"
     }
+    meetup_surveys {
+        bigint meetup_id PK, FK
+        uuid student_id PK, FK
+        int confidence_before "1-5"
+        int confidence_after "1-5"
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
     calendar_feeds {
         uuid token PK "secret in the calendar link"
         uuid student_id FK, UK
@@ -224,6 +235,7 @@ erDiagram
 | `friendships` | A friend request between two students, and whether it was accepted |
 | `messages`, `message_requests` | One-on-one messages (with read time), and first messages from non-friends waiting to be accepted |
 | `meetups` | A study session: when, how long, topic, where, status, and each side's "how did it go?" |
+| `meetup_surveys` | A student's private before/after confidence rating (1-5) and notes for a meetup they went to |
 | `calendar_feeds` | A student's private calendar link that Google Calendar (or Apple Calendar / Outlook) subscribes to |
 | `study_groups`, `group_members`, `group_messages` | One group per class plus groups made by matching, their members and chat |
 | `study_queue` | Students waiting in "Can't find anyone?" for a class or topic |
@@ -237,7 +249,7 @@ erDiagram
 - `students` **many-to-many** `students` through `friendships`, `messages`, `message_requests`, `meetups` and `user_blocks`: each has two foreign keys to `students`.
 - `app_users` **one-to-zero-or-one** `students`: a login has at most one profile. Demo students have no login.
 
-**Privacy:** only profiles, classes, topics, free times and study guides are publicly readable. Everything else (messages, friendships, meetups, groups, notifications, blocks, reports, calendar links) has no public access at all and is read through functions that check the user's login. The one exception is the calendar link: calendar apps can't log in, so the secret token in the link is the key, and the student can reset it.
+**Privacy:** only profiles, classes, topics, free times and study guides are publicly readable. Everything else (messages, friendships, meetups, confidence surveys, groups, notifications, blocks, reports, calendar links) has no public access at all and is read through functions that check the user's login. The one exception is the calendar link: calendar apps can't log in, so the secret token in the link is the key, and the student can reset it.
 
 ## Tech Stack
 

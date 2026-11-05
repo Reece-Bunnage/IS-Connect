@@ -15,6 +15,7 @@ drop table if exists calendar_feeds cascade;
 drop table if exists message_requests cascade;
 drop table if exists user_blocks cascade;
 drop table if exists study_resources cascade;
+drop table if exists meetup_surveys cascade;
 drop table if exists meetups cascade;
 drop table if exists availability_slots cascade;
 drop table if exists messages cascade;
@@ -171,6 +172,19 @@ create table meetups (
   revision           int not null default 0              -- the meetup changed (set by a trigger)
 );
 
+-- A student's private "how confident do you feel?" answers for one meetup they
+-- went to: 1-5 before (as they remember it) and after, plus optional notes.
+create table meetup_surveys (
+  meetup_id         bigint not null references meetups(id) on delete cascade,
+  student_id        uuid   not null references students(id) on delete cascade,
+  confidence_before int    not null check (confidence_before between 1 and 5),
+  confidence_after  int    not null check (confidence_after between 1 and 5),
+  notes             text   check (length(notes) <= 1000),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  primary key (meetup_id, student_id)
+);
+
 -- A student's private calendar link (Google Calendar, Apple Calendar or Outlook
 -- subscribe to it). Anyone with the token can see that student's meetups, so the
 -- student can reset it.
@@ -280,6 +294,7 @@ alter table friendships        enable row level security;
 alter table messages           enable row level security;
 alter table message_requests   enable row level security;
 alter table meetups            enable row level security;
+alter table meetup_surveys     enable row level security;
 alter table calendar_feeds     enable row level security;
 alter table user_blocks        enable row level security;
 alter table reports            enable row level security;

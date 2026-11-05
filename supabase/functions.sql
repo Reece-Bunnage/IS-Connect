@@ -770,6 +770,54 @@ drop trigger if exists touch_meetup on meetups;
 create trigger touch_meetup before update on meetups for each row execute function _touch_meetup();
 
 -- ===========================================================================
+-- Confidence surveys (after a meetup: how confident you felt before and after)
+
+-- Your own answers, one row per meetup. Nobody else can read them.
+create or replace function my_meetup_surveys(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_me uuid := _session_student(p_token);
+begin
+  return coalesce((select json_agg(json_build_object(
+            'meetup_id', meetup_id, 'confidence_before', confidence_before, 'confidence_after', confidence_after,
+            'notes', notes, 'created_at', created_at, 'updated_at', updated_at) order by created_at)
+          from meetup_surveys where student_id = v_me), '[]'::json);
+end $$;
+
+-- Save your answers for a meetup that has ended, or change them.
+create or replace function submit_meetup_survey(p_token uuid, p_meetup_id bigint, p_before int, p_after int, p_notes text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_me    uuid := _session_student(p_token);
+  v_m     meetups;
+  v_notes text := nullif(trim(p_notes), '');
+begin
+  select * into v_m from meetups where id = p_meetup_id and v_me in (requester_id, partner_id);
+  if v_m.id is null then
+    raise exception 'Meetup not found.';
+  end if;
+  if v_m.status not in ('confirmed', 'completed')
+     or v_m.scheduled_at + make_interval(mins => v_m.duration_minutes) > now() then
+    raise exception 'You can fill in the survey once the meetup is over.';
+  end if;
+  if (case when v_m.requester_id = v_me then v_m.requester_feedback else v_m.partner_feedback end) = 'no_show' then
+    raise exception 'You said this meetup didn''t happen, so there''s nothing to rate.';
+  end if;
+  if p_before is null or p_after is null or p_before not between 1 and 5 or p_after not between 1 and 5 then
+    raise exception 'Pick a number from 1 to 5 for before and after.';
+  end if;
+  if length(v_notes) > 1000 then
+    raise exception 'Notes can be at most 1,000 characters.';
+  end if;
+  insert into meetup_surveys (meetup_id, student_id, confidence_before, confidence_after, notes)
+    values (v_m.id, v_me, p_before, p_after, v_notes)
+    on conflict (meetup_id, student_id) do update
+      set confidence_before = excluded.confidence_before, confidence_after = excluded.confidence_after,
+          notes = excluded.notes, updated_at = now();
+end $$;
+
+-- ===========================================================================
 -- Calendar link (subscribe from Google Calendar, Apple Calendar or Outlook)
 
 -- Your calendar link's token and when a calendar app last checked it.

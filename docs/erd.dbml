@@ -2,7 +2,7 @@
 
 TableGroup logins { app_users app_sessions }
 TableGroup profiles { students skills courses student_skills student_needs student_courses availability_slots }
-TableGroup social { friendships messages message_requests meetups calendar_feeds user_blocks reports notifications }
+TableGroup social { friendships messages message_requests meetups meetup_surveys calendar_feeds user_blocks reports notifications }
 TableGroup groups { study_groups group_members group_messages study_queue }
 TableGroup resources { study_resources saved_resources }
 
@@ -123,6 +123,16 @@ Table meetups {
   created_at timestamptz
   updated_at timestamptz
   revision int [not null, default: 0, note: 'bumped on every change, for calendar apps']
+}
+
+Table meetup_surveys {
+  meetup_id bigint [pk, ref: > meetups.id]
+  student_id uuid [pk, ref: > students.id]
+  confidence_before int [not null, note: '1-5, as remembered after the meetup']
+  confidence_after int [not null, note: '1-5']
+  notes text [note: 'optional, up to 1,000 characters']
+  created_at timestamptz
+  updated_at timestamptz
 }
 
 Table calendar_feeds {

@@ -134,6 +134,18 @@ create table if not exists calendar_feeds (
   created_at      timestamptz not null default now(),
   last_fetched_at timestamptz
 );
+-- A student's private "how confident do you feel?" answers for one meetup they
+-- went to: 1-5 before (as they remember it) and after, plus optional notes.
+create table if not exists meetup_surveys (
+  meetup_id         bigint not null references meetups(id) on delete cascade,
+  student_id        uuid   not null references students(id) on delete cascade,
+  confidence_before int    not null check (confidence_before between 1 and 5),
+  confidence_after  int    not null check (confidence_after between 1 and 5),
+  notes             text   check (length(notes) <= 1000),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  primary key (meetup_id, student_id)
+);
 
 -- Row Level Security: lock the private tables, open the new public ones.
 alter table courses          enable row level security;
@@ -148,6 +160,7 @@ alter table group_members    enable row level security;
 alter table group_messages   enable row level security;
 alter table study_queue      enable row level security;
 alter table calendar_feeds   enable row level security;
+alter table meetup_surveys   enable row level security;
 
 drop policy if exists "Public read" on friendships;
 drop policy if exists "Public read" on messages;
