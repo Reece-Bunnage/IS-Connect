@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { formatHour, formatWhen, freeAt, toLocalInput, upcomingFreeHours } from '../time.js'
+import { formatHour, formatWhen, freeAt, freeHoursOn, nextSevenDays, toLocalInput } from '../time.js'
 import { Avatar, DemoBadge, Icon, PageHeader, programLabel } from '../ui.jsx'
 
 const DURATIONS = [
@@ -19,12 +19,13 @@ const STEPS = [
 ]
 
 // Time first, like "find a time" in a calendar app:
-//   1. When:    one of your free hours, each showing how many people are free then
+//   1. When:    a week of when people are free (how many each day and hour),
+//               with your own free hours marked
 //   2. Who:     the people free then, best matches first
 //   3. Details: how long, topic and place; then confirm and send.
 // The time and person live in the URL (?at=2026-11-10T16:00&partnerId=…), so
 // Back and swipe-back step back through them. Arriving with a partner already
-// chosen (from a profile or a chat) skips "Who" and shows the hours you're both free.
+// chosen (from a profile or a chat) skips "Who" and shows when they're free.
 export default function SetupMeetup({ go, back, me, params }) {
   const [topic, setTopic] = useState(params.topic ?? '')
   const [place, setPlace] = useState(PLACES[0])
@@ -52,7 +53,7 @@ export default function SetupMeetup({ go, back, me, params }) {
   // Move between steps; keeps a topic passed in (from "Meet again").
   const open = (next) => go('setupMeetup', { ...next, topic: params.topic })
 
-  const header = <PageHeader title="Set up a study session." text="Pick a time you're free, then someone who's free too." />
+  const header = <PageHeader title="Set up a study session." text="Pick a time when people are free, then who to meet." />
 
   if (params.partnerId && (!partner || partner.blockReason)) {
     return (
@@ -246,22 +247,57 @@ function Steps({ stage, partner }) {
   )
 }
 
-// Step 1. Phone: a strip of the next 7 days, then that day's free hours.
-// Desktop: all 7 days side by side (the same markup; index.css decides).
-function WhenStep({ go, open, mySlots, partner, invitable }) {
-  const days = upcomingFreeHours(mySlots).map((d) => ({
-    ...d,
-    hours: partner ? d.hours.filter((h) => freeAt(partner.availability_slots, h)) : d.hours,
-  }))
-  const [dayKey, setDayKey] = useState(() => (days.find((d) => d.hours.length) ?? days[0]).key)
-  const [custom, setCustom] = useState('')
-  const anyHours = days.some((d) => d.hours.length)
-  const dayName = (d, i) => (i === 0 ? 'Today' : d.date.toLocaleDateString(undefined, { weekday: 'short' }))
+// Step 1: when people are free over the next 7 days. Phone: a strip of days,
+// each with how many people are free, then the chosen day's hours. Desktop: all
+// 7 days side by side (same markup; index.css decides). Your own free hours are
+// marked; with a partner chosen, it shows their free hours instead.
+function buildWeek(mySlots, people, partner, now = new Date()) {
+  return nextSevenDays(now).map((date) => {
+    // Every hour someone you could meet is free, plus your own (not with a partner).
+    const starts = new Map()
+    for (const h of [...(partner ? [] : freeHoursOn(mySlots, date)), ...people.flatMap((s) => freeHoursOn(s.availability_slots, date))]) {
+      if (h > now) starts.set(h.getTime(), h)
+    }
+    const hours = [...starts.values()]
+      .sort((a, b) => a - b)
+      .map((at) => ({ at, free: people.filter((s) => freeAt(s.availability_slots, at)), mine: freeAt(mySlots, at) }))
+    return {
+      key: toLocalInput(date).slice(0, 10),
+      date,
+      hours,
+      peopleFree: new Set(hours.flatMap((h) => h.free.map((s) => s.id))).size,
+      mine: hours.some((h) => h.mine),
+    }
+  })
+}
 
-  function freeLabel(hour) {
-    if (partner) return 'Both free'
-    const n = invitable.filter((s) => freeAt(s.availability_slots, hour)).length
-    return n === 0 ? 'No one yet' : `${n} ${n === 1 ? 'person' : 'people'} free`
+function WhenStep({ go, open, mySlots, partner, invitable }) {
+  const days = buildWeek(mySlots, partner ? [partner] : invitable, partner)
+  // Start on the first day you and someone else are both free, else the first day anyone is.
+  const [dayKey, setDayKey] = useState(
+    () => (days.find((d) => d.hours.some((h) => h.mine && h.free.length)) ?? days.find((d) => d.peopleFree) ?? days[0]).key,
+  )
+  const [custom, setCustom] = useState('')
+  const first = partner?.full_name.split(' ')[0]
+  const anyone = days.some((d) => d.peopleFree)
+  const dayName = (d, i) => (i === 0 ? 'Today' : d.date.toLocaleDateString(undefined, { weekday: 'short' }))
+  const longDay = (d) => d.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+
+  function freeLabel(h) {
+    if (partner) return h.mine ? 'Both free' : `${first} is free`
+    const n = h.free.length
+    return n === 0 ? 'No one else yet' : `${n} ${n === 1 ? 'person' : 'people'} free`
+  }
+  // The number under each day: people free (or, with a partner, their free hours).
+  function dayCount(d) {
+    if (partner) return d.peopleFree ? `${d.hours.length}h` : ''
+    return d.peopleFree ? String(d.peopleFree) : ''
+  }
+  function dayLabel(d) {
+    const who = partner
+      ? d.peopleFree ? `${first} is free` : `${first} isn't free`
+      : `${d.peopleFree} ${d.peopleFree === 1 ? 'person' : 'people'} free`
+    return `${longDay(d)}: ${who}${d.mine ? ", you're free" : ''}`
   }
 
   return (
@@ -277,64 +313,74 @@ function WhenStep({ go, open, mySlots, partner, invitable }) {
         </section>
       )}
       <section className="card">
-        <h2>{partner ? `When are you both free?` : 'When are you free?'}</h2>
+        <h2>{partner ? `When is ${first} free?` : 'When are people free?'}</h2>
         {mySlots.length === 0 ? (
           <p className="notice">
-            Add your free times to see who's free when you are.{' '}
+            Add your own free times and we'll mark when you're free too.{' '}
             <button type="button" className="link" onClick={() => go('calendar')}>
               Open Availability →
             </button>
           </p>
         ) : (
-          <>
-            {!anyHours && (
-              <p className="muted">
-                {partner
-                  ? `You and ${partner.full_name.split(' ')[0]} aren't both free in the next week. Pick another time below.`
-                  : 'None of your free hours are left this week. Pick another time below.'}
-              </p>
-            )}
-            <div className="day-tabs">
-              {days.map((d, i) => (
-                <button
-                  key={d.key}
-                  type="button"
-                  className={`day-tab ${d.key === dayKey ? 'on' : ''} ${d.hours.length ? '' : 'empty'}`}
-                  aria-pressed={d.key === dayKey}
-                  aria-label={`${d.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}, ${d.hours.length} free ${d.hours.length === 1 ? 'hour' : 'hours'}`}
-                  onClick={() => setDayKey(d.key)}
-                >
-                  <span>{dayName(d, i)}</span>
-                  <strong>{d.date.getDate()}</strong>
-                </button>
-              ))}
-            </div>
-            <div className="week-grid">
-              {days.map((d, i) => (
-                <section key={d.key} className={`day-col ${d.key === dayKey ? 'on' : ''}`} aria-label={d.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
-                  <h3 className="day-col-head">
-                    {dayName(d, i)} <strong>{d.date.getDate()}</strong>
-                  </h3>
-                  {d.hours.length === 0 && <p className="muted small-text">{partner ? 'Not both free' : 'No free hours'}</p>}
-                  <ul className="hour-list">
-                    {d.hours.map((h) => {
-                      const label = freeLabel(h)
-                      return (
-                        <li key={h.getTime()}>
-                          <button type="button" className={`hour ${label === 'No one yet' ? 'none' : ''}`} onClick={() => open({ at: toLocalInput(h), partnerId: partner?.id })}>
-                            <span className="hour-time">{formatHour(h)}</span>
-                            <span className="hour-free">{label}</span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </>
+          <p className="muted small-text week-legend">
+            {partner ? `The hours ${first} is free.` : 'Numbers show how many people you can invite are free.'} <span className="you-dot" aria-hidden="true" />{' '}
+            means you're free too.
+          </p>
         )}
-        <details className="another-time" open={mySlots.length === 0 || !anyHours || undefined}>
+        {!anyone && (
+          <p className="muted">
+            {partner ? `${first} hasn't saved any free times for the next week.` : 'No one has saved free times for the next week yet.'} Pick a time below.
+          </p>
+        )}
+        <div className="day-tabs">
+          {days.map((d, i) => (
+            <button
+              key={d.key}
+              type="button"
+              className={`day-tab ${d.key === dayKey ? 'on' : ''} ${d.hours.length ? '' : 'empty'}`}
+              aria-pressed={d.key === dayKey}
+              aria-label={dayLabel(d)}
+              onClick={() => setDayKey(d.key)}
+            >
+              {d.mine && <span className="you-dot" aria-hidden="true" />}
+              <span>{dayName(d, i)}</span>
+              <strong>{d.date.getDate()}</strong>
+              <span className="day-count">{dayCount(d) || '–'}</span>
+            </button>
+          ))}
+        </div>
+        <div className="week-grid">
+          {days.map((d, i) => (
+            <section key={d.key} className={`day-col ${d.key === dayKey ? 'on' : ''}`} aria-label={dayLabel(d)}>
+              <h3 className="day-col-head">
+                {dayName(d, i)} <strong>{d.date.getDate()}</strong>
+                <span className="day-col-count">
+                  {d.mine && <span className="you-dot" aria-hidden="true" />}
+                  {!partner && d.peopleFree > 0 && `${d.peopleFree} free`}
+                </span>
+              </h3>
+              {d.hours.length === 0 && <p className="muted small-text">{partner ? `${first} isn't free` : 'No one free'}</p>}
+              <ul className="hour-list">
+                {d.hours.map((h) => (
+                  <li key={h.at.getTime()}>
+                    <button
+                      type="button"
+                      className={`hour ${h.mine ? 'mine' : ''} ${!partner && h.free.length === 0 ? 'none' : ''}`}
+                      onClick={() => open({ at: toLocalInput(h.at), partnerId: partner?.id })}
+                    >
+                      <span className="hour-time">
+                        {formatHour(h.at)}
+                        {h.mine && !partner && <span className="you-free">You're free</span>}
+                      </span>
+                      <span className="hour-free">{freeLabel(h)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+        <details className="another-time" open={!anyone || undefined}>
           <summary>Another time…</summary>
           <form
             className="row"

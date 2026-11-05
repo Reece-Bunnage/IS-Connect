@@ -68,23 +68,23 @@ export function freeAt(slots = [], date, minutes = 60) {
   )
 }
 
-// The next 7 days (today first), each with the hours in your free times that
-// haven't started yet, as Dates.
-export function upcomingFreeHours(slots = [], now = new Date()) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
-    const starts = new Set()
-    for (const s of slots) {
-      if (s.day_of_week !== weekday(date)) continue
-      const end = toMinutes(s.start_time) + s.duration_minutes
-      for (let m = toMinutes(s.start_time); m + 60 <= end; m += 60) starts.add(m)
+// The next 7 days (today first), as midnight Dates.
+export function nextSevenDays(now = new Date()) {
+  return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i))
+}
+
+// The whole hours someone is free on this date's weekday, as Dates.
+// A 4-6 PM free time gives 4 PM and 5 PM.
+export function freeHoursOn(slots = [], date) {
+  const hours = []
+  for (const s of slots) {
+    if (s.day_of_week !== weekday(date)) continue
+    const end = toMinutes(s.start_time) + s.duration_minutes
+    for (let m = toMinutes(s.start_time); m + 60 <= end; m += 60) {
+      hours.push(new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(m / 60), m % 60))
     }
-    const hours = [...starts]
-      .sort((a, b) => a - b)
-      .map((m) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(m / 60), m % 60))
-      .filter((h) => h > now)
-    return { key: toLocalInput(date).slice(0, 10), date, hours }
-  })
+  }
+  return hours
 }
 
 // '4 PM', or '4:30 PM' when it isn't on the hour.

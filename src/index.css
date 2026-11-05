@@ -300,17 +300,27 @@ details.members li > span { flex: 1; }
 .picked-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* Phone: a strip of 7 days, and only the chosen day's hours. */
 .day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 12px 0; }
-.day-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600; }
+.day-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600; }
 .day-tab strong { font-size: 1.1rem; }
+.day-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 0.72rem; font-weight: 700; line-height: 18px; }
 .day-tab.empty { background: var(--bg); color: var(--muted); }
+.day-tab.empty .day-count { background: none; color: var(--muted); }
 .day-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+.day-tab.on .day-count { background: #fff; color: var(--green); }
+/* "You're free" markers: a dot on days, a tag on hours. */
+.you-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2e9b5f; vertical-align: 1px; }
+.day-tab .you-dot { position: absolute; top: 5px; right: 5px; }
+.day-tab.on .you-dot { background: #fff; }
+.you-free { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 0.72rem; font-weight: 700; }
+.week-legend { margin: 4px 0 0; }
 .day-col { display: none; }
 .day-col.on { display: block; }
 .day-col-head { display: none; }
 .hour-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .hour { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); font: inherit; text-align: left; }
 .hour:hover { border-color: var(--green); background: var(--green-soft); }
-.hour-time { font-weight: 700; }
+.hour.mine { box-shadow: inset 4px 0 0 #2e9b5f; }
+.hour-time { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-weight: 700; }
 .hour-free { color: var(--green); font-size: 0.88rem; font-weight: 600; }
 .hour.none .hour-free { color: var(--muted); font-weight: 500; }
 .another-time { margin-top: 16px; }
@@ -327,6 +337,7 @@ details.others { margin-top: 16px; }
   .day-col, .day-col.on { display: block; }
   .day-col-head { display: block; margin: 0 0 8px; text-align: center; font-size: 0.85rem; color: var(--muted); }
   .day-col-head strong { display: block; font-size: 1.2rem; color: var(--text); }
+  .day-col-count { display: flex; justify-content: center; align-items: center; gap: 4px; min-height: 1.3em; color: var(--green); font-size: 0.75rem; font-weight: 700; }
   .day-col .muted { text-align: center; }
   .week-grid .hour { flex-direction: column; align-items: flex-start; gap: 0; min-height: 0; padding: 8px 10px; }
   .week-grid .hour-free { font-size: 0.78rem; }
