@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { rpc, usePolling, useQuery, useRpc } from '../api.js'
-import { ActiveDot, Avatar, DemoBadge, PageHeader } from '../ui.jsx'
+import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader } from '../ui.jsx'
 
 // Study groups: one per class (you're in the groups for your classes) plus
 // groups made by "Can't find anyone?" matching. List + chat, like Messages.
-export default function Groups({ go, me, params, refreshCounts, showToast }) {
-  const selectedId = params.groupId
+export default function Groups({ go, back, me, params, refreshCounts, showToast }) {
+  // Group ids are numbers; the URL gives them back as text.
+  const selectedId = params.groupId ? Number(params.groupId) : undefined
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const membersRef = useRef(null)
   const bottomRef = useRef(null)
 
   const groups = useRpc('my_groups', {}, [me.id])
@@ -50,7 +52,7 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
       await rpc('leave_group', { p_group_id: selectedId })
       showToast({ text: `You left ${g.name}.` })
       await groups.reload()
-      go('groups')
+      go('groups', {}, { replace: true })
     } catch (err) {
       setError(err.message)
     }
@@ -58,7 +60,7 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
 
   return (
     <>
-      <PageHeader title="Study together." text="Every class has a group. Add classes to your profile to join them, or get matched from Find Friends." />
+      <PageHeader className={selectedId ? 'hide-on-phone' : ''} title="Study together." text="Every class has a group. Add classes to your profile to join them, or get matched from Find Friends." />
 
       <div className={`messages-layout ${selectedId ? 'has-chat' : ''}`}>
         <section className="card convo-list">
@@ -94,26 +96,37 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
           {selectedId && detail.error && <p className="error">{detail.error}</p>}
           {selectedId && g && (
             <>
-              <div className="chat-header">
-                <button className="link back-to-list" onClick={() => go('groups')}>
-                  ← Groups
-                </button>
-                <div>
-                  <h2>{g.name}</h2>
-                  <p className="muted small-text">
-                    {g.kind === 'match' ? 'Matched because you all asked for the same thing.' : 'Everyone taking this class.'} {g.members.length} members
-                  </p>
-                </div>
-                {g.kind === 'match' && (
-                  <button className="link muted-link" onClick={leave}>
-                    Leave group
-                  </button>
-                )}
-              </div>
-
-              <details className="members">
-                <summary>Members</summary>
-                <ul>
+              <ChatBar
+                onBack={() => back('groups')}
+                backLabel="Back to groups"
+                icon={
+                  <span className={`group-icon ${g.kind}`} aria-hidden="true">
+                    {g.kind === 'match' ? '✨' : '#'}
+                  </span>
+                }
+                title={g.name}
+                subtitle={`${g.members.length} member${g.members.length === 1 ? '' : 's'}`}
+              >
+                <MoreMenu label={`Options for ${g.name}`}>
+                  <button onClick={() => membersRef.current.showModal()}>Members ({g.members.length})</button>
+                  {g.kind === 'match' && (
+                    <button className="danger" onClick={leave}>
+                      Leave group
+                    </button>
+                  )}
+                </MoreMenu>
+              </ChatBar>
+              <Dialog
+                dialogRef={membersRef}
+                titleId="members-title"
+                title={
+                  <>
+                    <h2>Members</h2>
+                    <p className="muted small-text">{g.kind === 'match' ? 'Matched because you all asked for the same thing.' : 'Everyone taking this class.'}</p>
+                  </>
+                }
+              >
+                <ul className="member-list">
                   {g.members.map((m) => (
                     <li key={m.id}>
                       <Avatar name={m.name} color={m.color} small />
@@ -122,14 +135,14 @@ export default function Groups({ go, me, params, refreshCounts, showToast }) {
                         {m.id === me.id && ' (you)'} <DemoBadge student={m} /> <ActiveDot lastActive={m.last_active_at} />
                       </span>
                       {m.id !== me.id && (
-                        <button className="link small" onClick={() => go('messages', { studentId: m.id })}>
+                        <button className="link small" aria-label={`Message ${m.name}`} onClick={() => go('messages', { studentId: m.id })}>
                           Message
                         </button>
                       )}
                     </li>
                   ))}
                 </ul>
-              </details>
+              </Dialog>
 
               <div className="bubbles">
                 {g.messages.length === 0 && (

@@ -11,9 +11,11 @@ drop table if exists group_messages cascade;
 drop table if exists group_members cascade;
 drop table if exists study_groups cascade;
 drop table if exists notifications cascade;
+drop table if exists calendar_feeds cascade;
 drop table if exists message_requests cascade;
 drop table if exists user_blocks cascade;
 drop table if exists study_resources cascade;
+drop table if exists meetup_surveys cascade;
 drop table if exists meetups cascade;
 drop table if exists availability_slots cascade;
 drop table if exists messages cascade;
@@ -165,7 +167,32 @@ create table meetups (
                      check (status in ('requested', 'confirmed', 'completed', 'cancelled')),
   requester_feedback text check (requester_feedback in ('great', 'okay', 'no_show')),
   partner_feedback   text check (partner_feedback in ('great', 'okay', 'no_show')),
-  created_at         timestamptz not null default now()
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(), -- these two tell calendar apps
+  revision           int not null default 0              -- the meetup changed (set by a trigger)
+);
+
+-- A student's private "how confident do you feel?" answers for one meetup they
+-- went to: 1-5 before (as they remember it) and after, plus optional notes.
+create table meetup_surveys (
+  meetup_id         bigint not null references meetups(id) on delete cascade,
+  student_id        uuid   not null references students(id) on delete cascade,
+  confidence_before int    not null check (confidence_before between 1 and 5),
+  confidence_after  int    not null check (confidence_after between 1 and 5),
+  notes             text   check (length(notes) <= 1000),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  primary key (meetup_id, student_id)
+);
+
+-- A student's private calendar link (Google Calendar, Apple Calendar or Outlook
+-- subscribe to it). Anyone with the token can see that student's meetups, so the
+-- student can reset it.
+create table calendar_feeds (
+  token           uuid primary key default gen_random_uuid(),
+  student_id      uuid not null unique references students(id) on delete cascade,
+  created_at      timestamptz not null default now(),
+  last_fetched_at timestamptz                    -- when a calendar app last checked the link
 );
 
 -- Block of another student (Safety & Privacy screen)
@@ -267,6 +294,8 @@ alter table friendships        enable row level security;
 alter table messages           enable row level security;
 alter table message_requests   enable row level security;
 alter table meetups            enable row level security;
+alter table meetup_surveys     enable row level security;
+alter table calendar_feeds     enable row level security;
 alter table user_blocks        enable row level security;
 alter table reports            enable row level security;
 alter table saved_resources    enable row level security;

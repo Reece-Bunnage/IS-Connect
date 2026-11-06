@@ -1,7 +1,9 @@
+
 import { useState } from 'react'
 import { rpc, useRpc } from '../api.js'
 import { formatWhen, googleCalendarLink } from '../time.js'
-import { Avatar, PageHeader } from '../ui.jsx'
+import { Avatar, Icon, PageHeader } from '../ui.jsx'
+import ConfidenceSurvey, { ConfidenceSummary } from './ConfidenceSurvey.jsx'
 
 const STATUS_LABEL = {
   requested: 'Waiting to confirm',
@@ -22,6 +24,7 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
   const [reschedule, setReschedule] = useState(null) // { id, value }
 
   const meetups = useRpc('my_meetups', {}, [me.id])
+  const surveys = useRpc('my_meetup_surveys', {}, [me.id])
 
   if (meetups.error) return <p className="error">Could not load meetups: {meetups.error}</p>
   if (!meetups.data) return <p className="muted">Loading meetups…</p>
@@ -94,7 +97,15 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
               </div>
             </div>
           )}
-
+          {end.getTime() <= now &&
+  ['confirmed', 'completed'].includes(m.status) &&
+  m.my_feedback !== 'no_show' && (
+    <ConfidenceSurvey
+      key={m.id}
+      meetup={m}
+      surveys={surveys}
+    />
+  )}
           {reschedule?.id === m.id && (
             <form
               className="row reschedule"
@@ -171,14 +182,161 @@ export default function Meetups({ go, me, refreshCounts, showToast }) {
           <h2 className="spaced">Upcoming</h2>
           {upcoming.length === 0 && <p className="muted">Nothing scheduled.</p>}
           <div className="list">{upcoming.map(card)}</div>
-          {past.length > 0 && (
-            <>
-              <h2 className="spaced">Past, cancelled & expired</h2>
-              <div className="list">{past.map(card)}</div>
-            </>
-          )}
+        </>
+      )}
+      <ConfidenceSummary surveys={surveys} />
+      <CalendarLink me={me} showToast={showToast} />
+
+      {past.length > 0 && (
+        <>
+          <h2 className="spaced">Past, cancelled & expired</h2>
+          <div className="list">{past.map(card)}</div>
         </>
       )}
     </>
+  )
+}
+
+// A private link that Google Calendar (or Apple Calendar / Outlook) subscribes to.
+// Served by the Edge Function in supabase/functions/calendar.
+// Whether you closed the calendar card with ×, remembered in this browser.
+function useHiddenCard(key) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1'
+    } catch {
+      return false
+    }
+  })
+  function set(value) {
+    setHidden(value)
+    try {
+      if (value) localStorage.setItem(key, '1')
+      else localStorage.removeItem(key)
+    } catch {
+      // Storage unavailable: it stays hidden until the page reloads.
+    }
+  }
+  return [hidden, set]
+}
+
+function CalendarLink({ me, showToast }) {
+  const feed = useRpc('my_calendar_feed', {}, [me.id])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [confirming, setConfirming] = useState(null) // 'reset' | 'off'
+  const [hidden, setHidden] = useHiddenCard(`is-connect-hide-calendar-card-${me.id}`)
+
+  if (!feed.data) return feed.error ? <p className="error">Could not load your calendar link: {feed.error}</p> : null
+
+  // Closed with ×: one line, so Reset / Turn off stay reachable.
+  if (hidden) {
+    return (
+      <p className="calendar-mini muted small-text">
+        <Icon name="calendar" size={16} />
+        {feed.data.token ? 'Calendar link is on.' : 'Want your meetups in Google Calendar?'}
+        <button className="link small" onClick={() => setHidden(false)}>
+          {feed.data.token ? 'Calendar settings' : 'Set it up'}
+        </button>
+      </p>
+    )
+  }
+
+  const { token, last_fetched_at: lastChecked } = feed.data
+  const url = token && `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calendar/${token}.ics`
+  // Google's "add calendar" screen expects a webcal:// address.
+  const googleUrl = url && `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(url.replace(/^https:/, 'webcal:'))}`
+
+  async function change(fn, toastText) {
+    setBusy(true)
+    setError(null)
+    try {
+      await rpc(fn)
+      await feed.reload()
+      setConfirming(null)
+      showToast({ text: toastText })
+    } catch (err) {
+      setError(err.message)
+    }
+    setBusy(false)
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast({ text: 'Calendar link copied. Paste it into your calendar app.' })
+    } catch {
+      showToast({ text: `Your calendar link: ${url}` })
+    }
+  }
+
+  return (
+    <section className="card calendar-link">
+      <div className="card-head">
+        <h2>See your meetups in Google Calendar</h2>
+        <button className="close-button" aria-label="Hide calendar link card" title="Hide" onClick={() => setHidden(true)}>
+          ×
+        </button>
+      </div>
+      <p className="muted">
+        Subscribe once and your meetups show up by themselves. Requests say "Pending" until they're confirmed, new times move the event, and
+        cancelled meetups disappear.
+      </p>
+      {error && <p className="error">{error}</p>}
+
+      {!token ? (
+        <button className="secondary" disabled={busy} onClick={() => change('new_calendar_feed', 'Calendar link is on.')}>
+          Turn on calendar link
+        </button>
+      ) : (
+        <>
+          <div className="row actions">
+            <a className="primary small button-link" href={googleUrl} target="_blank" rel="noreferrer">
+              Subscribe in Google Calendar
+            </a>
+            <button className="secondary small" onClick={copy}>
+              Copy link (Apple Calendar, Outlook)
+            </button>
+          </div>
+          <p className="muted small-text">
+            Google checks for changes every few hours, so updates can take a while to appear.{' '}
+            {lastChecked ? `A calendar app last checked ${formatWhen(lastChecked)}.` : 'No calendar app has checked this link yet.'}
+          </p>
+          <p className="muted small-text">Anyone with this link can see your meetups. If you shared it by mistake, reset it.</p>
+          {confirming ? (
+            <div className="row actions">
+              <span className="small-text">
+                {confirming === 'reset'
+                  ? 'Your calendar stops updating until you subscribe with the new link.'
+                  : 'Your calendar keeps the meetups it has but stops updating. Remove "IS-Connect meetups" from it to clear them.'}
+              </span>
+              <button
+                className="secondary small"
+                disabled={busy}
+                onClick={() =>
+                  confirming === 'reset'
+                    ? change('new_calendar_feed', 'New calendar link made. Subscribe again with it.')
+                    : change('stop_calendar_feed', 'Calendar link turned off.')
+                }
+              >
+                {confirming === 'reset' ? 'Reset link' : 'Turn off'}
+              </button>
+              <button className="link small" onClick={() => setConfirming(null)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="row actions">
+              <button className="link small" onClick={() => setConfirming('reset')}>
+                Reset link
+              </button>
+              <button className="link small" onClick={() => setConfirming('off')}>
+                Turn off
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   )
 }

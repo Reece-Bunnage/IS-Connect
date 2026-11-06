@@ -30,10 +30,13 @@ erDiagram
     students ||--o{ messages : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ message_requests : "1-to-many: sends / receives (2 FKs)"
     students ||--o{ meetups : "1-to-many: requests / is partner (2 FKs)"
+    meetups ||--o{ meetup_surveys : "1-to-many: rated in (one per student)"
+    students ||--o{ meetup_surveys : "1-to-many: fills in"
     students ||--o{ user_blocks : "1-to-many: blocks / is blocked (2 FKs)"
     students ||--o{ reports : "1-to-many: reports / is reported"
     study_resources ||--o{ reports : "1-to-many: is reported"
     students ||--o{ notifications : "1-to-many: receives"
+    students ||--o| calendar_feeds : "1-to-0..1: calendar link"
     courses ||--o{ study_groups : "1-to-many: has a course group"
     skills ||--o{ study_groups : "1-to-many: topic of match groups"
     study_groups ||--o{ group_members : "M:N with students"
@@ -146,6 +149,23 @@ erDiagram
         text requester_feedback
         text partner_feedback
         timestamptz created_at
+        timestamptz updated_at
+        int revision "bumped on every change"
+    }
+    meetup_surveys {
+        bigint meetup_id PK, FK
+        uuid student_id PK, FK
+        int confidence_before "1-5"
+        int confidence_after "1-5"
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    calendar_feeds {
+        uuid token PK "secret in the calendar link"
+        uuid student_id FK, UK
+        timestamptz created_at
+        timestamptz last_fetched_at
     }
     user_blocks {
         bigint id PK
@@ -215,6 +235,8 @@ erDiagram
 | `friendships` | A friend request between two students, and whether it was accepted |
 | `messages`, `message_requests` | One-on-one messages (with read time), and first messages from non-friends waiting to be accepted |
 | `meetups` | A study session: when, how long, topic, where, status, and each side's "how did it go?" |
+| `meetup_surveys` | A student's private before/after confidence rating (1-5) and notes for a meetup they went to |
+| `calendar_feeds` | A student's private calendar link that Google Calendar (or Apple Calendar / Outlook) subscribes to |
 | `study_groups`, `group_members`, `group_messages` | One group per class plus groups made by matching, their members and chat |
 | `study_queue` | Students waiting in "Can't find anyone?" for a class or topic |
 | `notifications` | Things that happened involving a student (requests, accepted, matched...) |
@@ -227,7 +249,7 @@ erDiagram
 - `students` **many-to-many** `students` through `friendships`, `messages`, `message_requests`, `meetups` and `user_blocks`: each has two foreign keys to `students`.
 - `app_users` **one-to-zero-or-one** `students`: a login has at most one profile. Demo students have no login.
 
-**Privacy:** only profiles, classes, topics, free times and study guides are publicly readable. Everything else (messages, friendships, meetups, groups, notifications, blocks, reports) has no public access at all and is read through functions that check the user's login.
+**Privacy:** only profiles, classes, topics, free times and study guides are publicly readable. Everything else (messages, friendships, meetups, confidence surveys, groups, notifications, blocks, reports, calendar links) has no public access at all and is read through functions that check the user's login. The one exception is the calendar link: calendar apps can't log in, so the secret token in the link is the key, and the student can reset it.
 
 ## Tech Stack
 
@@ -236,6 +258,7 @@ erDiagram
 | Frontend | React 19 + Vite (HTML/CSS/JavaScript) |
 | Backend / API | [Supabase](https://supabase.com), backend as a service. It generates a REST API from our tables, and we call it with the `@supabase/supabase-js` client. |
 | Database | PostgreSQL, hosted by Supabase, with Row Level Security policies |
+| Calendar link | A Supabase Edge Function ([supabase/functions/calendar](supabase/functions/calendar)) that turns a student's meetups into a calendar file for Google Calendar to subscribe to |
 | Secrets | The Supabase URL and publishable key live in `.env.local`, which is listed in `.gitignore` |
 
 **Why this fits our team:** Supabase's free tier gives us a real PostgreSQL database without running or hosting our own server. Every teammate can see the tables and rows in the Supabase dashboard, and we can still write the schema ourselves in SQL ([supabase/schema.sql](supabase/schema.sql)). The whole team shares one project, so our setups can't drift apart. React + Vite is a small, fast setup that works well on phones, which matters because our persona would mostly use IS-Connect on their phone.
@@ -279,7 +302,7 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
 
    (No terminal? Paste [supabase/schema.sql](supabase/schema.sql), [supabase/functions.sql](supabase/functions.sql), [supabase/reference.sql](supabase/reference.sql), then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. `schema.sql` deletes existing data; the others are safe to re-run.)
 
-   Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has the 22 tables listed in the ERD above. The course list lives in [supabase/reference.sql](supabase/reference.sql); edit the names to match the catalog and re-run it.
+   Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has the 23 tables listed in the ERD above. The course list lives in [supabase/reference.sql](supabase/reference.sql); edit the names to match the catalog and re-run it.
 4. **Make yourself an admin** (optional): sign up in the app, then run `npm run make-admin -- yourusername`. Admins see a **Reports** screen with reports of students and study guides. `--remove` takes it away.
 5. **Start the app**
    ```bash
@@ -294,6 +317,22 @@ Every push to `main` rebuilds the live site through [.github/workflows/deploy.ym
 1. **Settings → Secrets and variables → Actions → New repository secret**: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (same values as `.env.local`).
 2. **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions**.
 3. **Actions → Deploy to GitHub Pages → Run workflow** (or just push to `main`).
+
+**Calendar link (Edge Function).** This part runs on Supabase, not GitHub, so it's deployed separately. You only need to redeploy it when [supabase/functions/calendar](supabase/functions/calendar) changes. One person on the team does this from their own computer:
+
+1. In Supabase, open your account menu → **Account → Access Tokens → Generate new token**. Don't use **Create legacy token**, which can manage your whole account. Give the token the least access it needs:
+   - **Resource access:** **Project**, then pick the IS-Connect project.
+   - **Permissions:** leave everything at **None** except **Application services → Edge Functions: Read-write** and **Project → Project Settings: Read**.
+   - A limited token starts with `sbp_fc`. One with a **Legacy** badge has full account access, so delete it and make another.
+
+   Add it to `.env.local`:
+   ```
+   SUPABASE_ACCESS_TOKEN=<your token>
+   ```
+   Keep it **only** in `.env.local`, never in GitHub or a chat. When it expires, make a new one the next time you need to deploy.
+2. Run `npm run deploy:calendar`. Docker isn't needed. It prints the address calendar links are served from.
+
+If [supabase/functions.sql](supabase/functions.sql) or the database changed too, run `npm run db:functions` or `npm run db:upgrade` first, as above.
 
 ## Verifying the Vertical Slice
 
@@ -312,6 +351,7 @@ Try this walkthrough on the live site:
 7. **Message someone.** Message Emma. Her reply appears a moment later and the **Messages** badge counts it.
 8. **Message requests and privacy.** With a second account in a different browser, message your first account: it arrives under **Requests**, not Chats. In **Safety & Privacy**, try **Friends only**, and the second account gets "only accepts messages from friends".
 9. **Schedule a meetup.** From the chat, click **Schedule a meetup →**, pick the shared time, a length, a topic and a place, then **Send request**. In **My Meetups**, try **Suggest new time**.
+   - **Put it on Google Calendar.** In **My Meetups**, under **See your meetups in Google Calendar**, click **Turn on calendar link**, then **Subscribe in Google Calendar**. Requests show as "Pending: Study session with …" and change once they're confirmed. Cancelled meetups disappear. Google only checks the link every few hours, so changes take a while to show. To save one confirmed meetup without subscribing, use **Add to Google Calendar** on that meetup.
 10. **Notifications.** Actions involving you (friend requests, accepted requests, matches, meetup invites) show on the bell 🔔. A confirmed meetup in the next 24 hours shows as a reminder.
 11. **Study guides.** Share one for IS 201, **☆ Save** someone else's, and filter by **Saved** or **My classes**. **Report** sends it to the admins.
 12. **Block someone.** In **Safety & Privacy**, block Emma, confirm, then **Undo** from the message at the bottom of the screen.

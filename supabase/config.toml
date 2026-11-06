@@ -1,0 +1,7 @@
+# Supabase CLI settings. Only used to deploy the calendar Edge Function
+# (npm run deploy:calendar). The database is set up with the scripts in scripts/.
+project_id = "IS-Connect"
+
+[functions.calendar]
+# Calendar apps fetch the link without logging in; the token in the link is the key.
+verify_jwt = false

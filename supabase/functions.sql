@@ -757,6 +757,124 @@ begin
     where id = v_m.id;
 end $$;
 
+-- Every change to a meetup bumps its revision, so subscribed calendars update it.
+create or replace function _touch_meetup() returns trigger
+language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.revision := old.revision + 1;
+  return new;
+end $$;
+
+drop trigger if exists touch_meetup on meetups;
+create trigger touch_meetup before update on meetups for each row execute function _touch_meetup();
+
+-- ===========================================================================
+-- Confidence surveys (after a meetup: how confident you felt before and after)
+
+-- Your own answers, one row per meetup. Nobody else can read them.
+create or replace function my_meetup_surveys(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_me uuid := _session_student(p_token);
+begin
+  return coalesce((select json_agg(json_build_object(
+            'meetup_id', meetup_id, 'confidence_before', confidence_before, 'confidence_after', confidence_after,
+            'notes', notes, 'created_at', created_at, 'updated_at', updated_at) order by created_at)
+          from meetup_surveys where student_id = v_me), '[]'::json);
+end $$;
+
+-- Save your answers for a meetup that has ended, or change them.
+create or replace function submit_meetup_survey(p_token uuid, p_meetup_id bigint, p_before int, p_after int, p_notes text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_me    uuid := _session_student(p_token);
+  v_m     meetups;
+  v_notes text := nullif(trim(p_notes), '');
+begin
+  select * into v_m from meetups where id = p_meetup_id and v_me in (requester_id, partner_id);
+  if v_m.id is null then
+    raise exception 'Meetup not found.';
+  end if;
+  if v_m.status not in ('confirmed', 'completed')
+     or v_m.scheduled_at + make_interval(mins => v_m.duration_minutes) > now() then
+    raise exception 'You can fill in the survey once the meetup is over.';
+  end if;
+  if (case when v_m.requester_id = v_me then v_m.requester_feedback else v_m.partner_feedback end) = 'no_show' then
+    raise exception 'You said this meetup didn''t happen, so there''s nothing to rate.';
+  end if;
+  if p_before is null or p_after is null or p_before not between 1 and 5 or p_after not between 1 and 5 then
+    raise exception 'Pick a number from 1 to 5 for before and after.';
+  end if;
+  if length(v_notes) > 1000 then
+    raise exception 'Notes can be at most 1,000 characters.';
+  end if;
+  insert into meetup_surveys (meetup_id, student_id, confidence_before, confidence_after, notes)
+    values (v_m.id, v_me, p_before, p_after, v_notes)
+    on conflict (meetup_id, student_id) do update
+      set confidence_before = excluded.confidence_before, confidence_after = excluded.confidence_after,
+          notes = excluded.notes, updated_at = now();
+end $$;
+
+-- ===========================================================================
+-- Calendar link (subscribe from Google Calendar, Apple Calendar or Outlook)
+
+-- Your calendar link's token and when a calendar app last checked it.
+-- token is null when the link is off.
+create or replace function my_calendar_feed(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_me uuid := _session_student(p_token);
+begin
+  return coalesce((select json_build_object('token', token, 'created_at', created_at, 'last_fetched_at', last_fetched_at)
+                   from calendar_feeds where student_id = v_me),
+                  json_build_object('token', null));
+end $$;
+
+-- Turn the calendar link on, or replace it (the old link stops working).
+create or replace function new_calendar_feed(p_token uuid) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_me    uuid := _session_student(p_token);
+  v_token uuid;
+begin
+  insert into calendar_feeds (student_id) values (v_me)
+    on conflict (student_id) do update set token = gen_random_uuid(), created_at = now(), last_fetched_at = null
+    returning token into v_token;
+  return v_token;
+end $$;
+
+create or replace function stop_calendar_feed(p_token uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from calendar_feeds where student_id = _session_student(p_token);
+end $$;
+
+-- Read by the calendar Edge Function (supabase/functions/calendar) when a calendar
+-- app checks a link. Needs no login: the link's token is the key. Returns null for
+-- a link that was reset or turned off. Cancelled and expired meetups are left out,
+-- so they disappear from the calendar.
+create or replace function calendar_feed_events(p_feed_token uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid;
+begin
+  update calendar_feeds set last_fetched_at = now() where token = p_feed_token returning student_id into v_me;
+  if v_me is null then
+    return null;
+  end if;
+  return coalesce((select json_agg(json_build_object(
+            'id', m.id, 'scheduled_at', m.scheduled_at, 'duration_minutes', m.duration_minutes,
+            'topic', m.topic, 'location', m.location, 'status', m.status, 'i_asked', m.requester_id = v_me,
+            'other_name', s.full_name, 'updated_at', m.updated_at, 'revision', m.revision)
+          order by m.scheduled_at)
+          from meetups m join students s on s.id = case when m.requester_id = v_me then m.partner_id else m.requester_id end
+          where v_me in (m.requester_id, m.partner_id)
+            and (m.status in ('confirmed', 'completed') or (m.status = 'requested' and m.scheduled_at >= now()))),
+          '[]'::json);
+end $$;
+
 -- ===========================================================================
 -- Study resources
 

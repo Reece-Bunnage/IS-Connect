@@ -24,6 +24,40 @@ export function formatSlot(slot) {
   return `${slot.day_of_week} ${formatTime(slot.start_time)}`
 }
 
+// Minutes after midnight -> '9:30 AM'. 1440 (midnight, as an end time) -> '12:00 AM'.
+export function formatMinutes(m) {
+  return formatTime(toHHMM(m % 1440))
+}
+
+// [start, end] minute ranges that overlap or touch -> merged and sorted.
+export function mergeRanges(ranges) {
+  const merged = []
+  for (const [start, end] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    const last = merged.at(-1)
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end)
+    else merged.push([start, end])
+  }
+  return merged
+}
+
+// Weekly slots -> { Mon: [[540, 720], ...], ... }: each day's free times as
+// merged minute ranges (so back-to-back 1-hour blocks become one range).
+export function rangesByDay(slots = []) {
+  const byDay = Object.fromEntries(DAYS.map((d) => [d, []]))
+  for (const s of slots) {
+    const start = toMinutes(s.start_time)
+    byDay[s.day_of_week]?.push([start, start + s.duration_minutes])
+  }
+  for (const d of DAYS) byDay[d] = mergeRanges(byDay[d])
+  return byDay
+}
+
+// 'Mon 9:00 AM – 12:00 PM, Wed 1:00 PM – 4:00 PM'
+export function formatWeek(slots = []) {
+  const byDay = rangesByDay(slots)
+  return DAYS.flatMap((d) => byDay[d].map(([s, e]) => `${d} ${formatMinutes(s)} – ${formatMinutes(e)}`)).join(', ')
+}
+
 // Times both students are free (at least 30 minutes), sorted Mon -> Sun.
 export function sharedSlots(mine = [], theirs = []) {
   const shared = new Map()
@@ -46,16 +80,50 @@ export function sharedSlots(mine = [], theirs = []) {
   )
 }
 
-// The next date (in local time) that falls on this weekday and time.
-export function nextDateFor(day, hhmm) {
-  const now = new Date()
-  const target = new Date(now)
-  const jsDay = (DAYS.indexOf(day) + 1) % 7 // JS: Sunday = 0
-  target.setDate(now.getDate() + ((jsDay - now.getDay() + 7) % 7))
-  const minutes = toMinutes(hhmm)
-  target.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
-  if (target <= now) target.setDate(target.getDate() + 7)
-  return target
+const pad = (n) => String(n).padStart(2, '0')
+
+// A Date -> '2026-11-10T16:00' in local time: what <input type="datetime-local">
+// uses, and how Set Up Meetup keeps the chosen time in its URL.
+export function toLocalInput(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// 'Mon'..'Sun' for a Date.
+export function weekday(date) {
+  return DAYS[(date.getDay() + 6) % 7] // JS: Sunday = 0
+}
+
+// Whether someone's weekly free times cover `minutes` minutes from `date`.
+export function freeAt(slots = [], date, minutes = 60) {
+  const day = weekday(date)
+  const start = date.getHours() * 60 + date.getMinutes()
+  return slots.some(
+    (s) => s.day_of_week === day && toMinutes(s.start_time) <= start && start + minutes <= toMinutes(s.start_time) + s.duration_minutes,
+  )
+}
+
+// The next 7 days (today first), as midnight Dates.
+export function nextSevenDays(now = new Date()) {
+  return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i))
+}
+
+// The whole hours someone is free on this date's weekday, as Dates.
+// A 4-6 PM free time gives 4 PM and 5 PM.
+export function freeHoursOn(slots = [], date) {
+  const hours = []
+  for (const s of slots) {
+    if (s.day_of_week !== weekday(date)) continue
+    const end = toMinutes(s.start_time) + s.duration_minutes
+    for (let m = toMinutes(s.start_time); m + 60 <= end; m += 60) {
+      hours.push(new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(m / 60), m % 60))
+    }
+  }
+  return hours
+}
+
+// '4 PM', or '4:30 PM' when it isn't on the hour.
+export function formatHour(date) {
+  return date.toLocaleTimeString(undefined, date.getMinutes() ? { hour: 'numeric', minute: '2-digit' } : { hour: 'numeric' })
 }
 
 // 'Wed, Oct 15 · 3:00 PM'

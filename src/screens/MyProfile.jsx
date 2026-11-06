@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { rpc } from '../api.js'
-import { formatSlot } from '../time.js'
+import { formatWeek } from '../time.js'
 import { Avatar, CompletenessMeter, programLabel } from '../ui.jsx'
 
 const CONTACT_LABEL = { anyone: 'Anyone', courses: 'Classmates and friends', friends: 'Friends only' }
@@ -101,7 +101,7 @@ export default function MyProfile({ go, profile, session, onDeleted }) {
           <dt>Ask me about</dt>
           <dd>{profile.ask_me_about || <span className="muted">Not set</span>}</dd>
           <dt>Free times</dt>
-          <dd>{profile.availability_slots.length ? profile.availability_slots.map(formatSlot).join(', ') : <span className="muted">Not set</span>}</dd>
+          <dd>{profile.availability_slots.length ? formatWeek(profile.availability_slots) : <span className="muted">Not set</span>}</dd>
           <dt>Who can contact me</dt>
           <dd>
             {CONTACT_LABEL[profile.contact_setting]}{' '}

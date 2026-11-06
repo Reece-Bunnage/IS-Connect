@@ -18,20 +18,34 @@ import BlockReport from './screens/BlockReport.jsx'
 import Notifications from './screens/Notifications.jsx'
 import Reports from './screens/Reports.jsx'
 
-const SCREEN_KEY = 'is-connect-screen'
-const PARAMS_KEY = 'is-connect-params'
-
-// The screen (and its params, e.g. which chat is open) is remembered so a
-// refresh reopens the same place.
-function loadNav() {
-  try {
-    return {
-      screen: localStorage.getItem(SCREEN_KEY) || 'home',
-      params: JSON.parse(localStorage.getItem(PARAMS_KEY) || '{}'),
-    }
-  } catch {
-    return { screen: 'home', params: {} }
+// Every screen has its own URL, e.g. #/messages?studentId=…, so the browser's
+// Back button and the phone's swipe-back gesture step through the app instead
+// of leaving it, and a refresh reopens the same place. Hash URLs need no
+// server setup, so they work on GitHub Pages.
+function toHash(screen, params = {}) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== false && value !== '') query.set(key, String(value))
   }
+  const qs = query.toString()
+  return `#/${screen === 'home' ? '' : screen}${qs ? `?${qs}` : ''}`
+}
+
+// Params come back as strings (e.g. freeMatch: "true").
+function fromHash(hash = window.location.hash) {
+  const [path, qs = ''] = hash.replace(/^#\/?/, '').split('?')
+  return { screen: decodeURIComponent(path) || 'home', params: Object.fromEntries(new URLSearchParams(qs)) }
+}
+
+function currentHash() {
+  const { screen, params } = fromHash()
+  return toHash(screen, params)
+}
+
+// history.state for each app entry: `depth` counts the app pages behind it,
+// `prevScreen` is the screen of the one directly behind it.
+function historyState() {
+  return window.history.state ?? { depth: 0, prevScreen: null }
 }
 
 // Screens that only make sense once you have a profile.
@@ -42,12 +56,20 @@ const PROFILE_SELECT =
   'student_needs(skill_id, skills(name)), availability_slots(day_of_week, start_time, duration_minutes)'
 
 export default function App() {
-  const [{ screen, params }, setNav] = useState(loadNav)
+  const [{ screen, params }, setNav] = useState(() => fromHash())
   const [session, setSession] = useState(undefined) // undefined = still checking
   const [profile, setProfile] = useState(undefined) // undefined = loading, null = none yet
   const [profileError, setProfileError] = useState(null)
   const [counts, setCounts] = useState(null)
   const [toast, setToast] = useState(null)
+
+  // Back/forward (button or swipe) changes the URL; show the screen it names.
+  useEffect(() => {
+    if (!window.history.state) window.history.replaceState(historyState(), '')
+    const onPop = () => setNav(fromHash())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   // Pick up the login this browser saved, if it's still valid.
   useEffect(() => {
@@ -96,32 +118,44 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  function go(next, nextParams = {}) {
-    setNav({ screen: next, params: nextParams })
-    try {
-      localStorage.setItem(SCREEN_KEY, next)
-      localStorage.setItem(PARAMS_KEY, JSON.stringify(nextParams))
-    } catch {
-      // Storage unavailable; the app still works, it just won't remember the screen.
-    }
+  // Open a screen. `replace` swaps the current history entry instead of adding
+  // one: use it after a form is submitted or something is left/deleted, so
+  // Back doesn't return to a page that no longer applies.
+  function go(next, nextParams = {}, { replace = false } = {}) {
+    const url = toHash(next, nextParams)
+    const here = historyState()
+    if (replace) window.history.replaceState(here, '', url)
+    else if (url !== currentHash()) window.history.pushState({ depth: here.depth + 1, prevScreen: fromHash().screen }, '', url)
+    // Read params back from the URL so a click and a refresh see the same values.
+    setNav(fromHash(url))
     window.scrollTo(0, 0)
+  }
+
+  // One step back inside the app. With `to` (an in-page "← Messages" link) it
+  // only steps back if that screen is the page behind; otherwise it opens `to`.
+  // If there's no app page behind (the link was opened directly), it opens the
+  // parent screen or Home rather than leaving the site.
+  function back(to, toParams = {}) {
+    const here = historyState()
+    if (here.depth > 0 && (to === undefined || here.prevScreen === to)) window.history.back()
+    else go(to ?? NAV_PARENT[screen] ?? 'home', toParams, { replace: true })
   }
 
   async function logOut() {
     await endSession()
     setSession(null)
     setCounts(null)
-    go('home')
+    go('home', {}, { replace: true })
   }
 
   function accountDeleted() {
     forgetSession()
     setSession(null)
     setCounts(null)
-    go('home')
+    go('home', {}, { replace: true })
   }
 
-  const props = { go, me: profile, params, counts, refreshCounts, showToast: setToast }
+  const props = { go, back, me: profile, params, counts, refreshCounts, showToast: setToast }
   const screens = {
     home: <Home {...props} />,
     createProfile: <CreateProfile go={go} profile={profile} onSaved={reloadProfile} />,
@@ -160,8 +194,8 @@ export default function App() {
         {session && (
           <div className="row account">
             {screen !== 'home' && (
-              <button className="link back-home" onClick={() => go('home')}>
-                ← Home
+              <button className="link back-home" onClick={() => back()}>
+                ← Back
               </button>
             )}
             {profile && (

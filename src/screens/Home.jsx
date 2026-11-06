@@ -186,7 +186,7 @@ export default function Home({ go, me, counts, refreshCounts, showToast }) {
     <div className="home">
       <section className="greeting">
         <div>
-          <p className="eyebrow-muted">Your IS community</p>
+          <p className="eyebrow-muted">Your I.S. community</p>
           <h1>Welcome back, {firstName(me.full_name)}.</h1>
           <p className="meta-lg">{line}</p>
         </div>

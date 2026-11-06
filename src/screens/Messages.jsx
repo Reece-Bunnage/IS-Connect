@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, usePolling, useQuery, useRpc } from '../api.js'
-import { ActiveDot, Avatar, DemoBadge, PageHeader, activeLabel } from '../ui.jsx'
+import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader, ProfileDetails, activeLabel, hasProfileDetails, programLabel } from '../ui.jsx'
 
 // Conversation suggestions so a nervous first message isn't a blank box.
 function icebreakers(me, other) {
@@ -18,13 +18,14 @@ function icebreakers(me, other) {
 
 // Inbox (Chats / Requests) + one open chat (params.studentId). On a phone
 // only one shows at a time; on a wide screen they sit side by side.
-export default function Messages({ go, me, params, refreshCounts }) {
+export default function Messages({ go, back, me, params, refreshCounts }) {
   const selectedId = params.studentId
   const [tab, setTab] = useState(params.tab ?? 'chats')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
   const bottomRef = useRef(null)
+  const profileRef = useRef(null)
 
   const inbox = useRpc('my_inbox', {}, [me.id])
   const chat = useQuery(() => (selectedId ? rpc('my_chat', { p_other_id: selectedId }) : Promise.resolve(null)), [selectedId])
@@ -32,7 +33,7 @@ export default function Messages({ go, me, params, refreshCounts }) {
     () =>
       supabase
         .from('students')
-        .select('id, user_id, full_name, avatar_color, ask_me_about, student_courses(courses(code)), student_skills(skills(name))')
+        .select('id, user_id, full_name, avatar_color, program_status, bio, ask_me_about, student_courses(courses(code)), student_skills(skills(name)), student_needs(skills(name))')
         .order('full_name'),
     [],
   )
@@ -83,7 +84,7 @@ export default function Messages({ go, me, params, refreshCounts }) {
       await rpc('respond_message_request', { p_other_id: selectedId, p_accept: accept })
       await Promise.all([chat.reload(), inbox.reload()])
       refreshCounts()
-      if (!accept) go('messages', { tab: 'requests' })
+      if (!accept) go('messages', { tab: 'requests' }, { replace: true })
     } catch (err) {
       setSendError(err.message)
     }
@@ -91,7 +92,8 @@ export default function Messages({ go, me, params, refreshCounts }) {
 
   return (
     <>
-      <PageHeader title="A conversation is a good start." text="Ask a question or plan a time to work through something together." />
+      {/* In an open chat on a phone, the conversation gets the whole screen. */}
+      <PageHeader className={selectedId ? 'hide-on-phone' : ''} title="A conversation is a good start." text="Ask a question or plan a time to work through something together." />
 
       <div className={`messages-layout ${selectedId ? 'has-chat' : ''}`}>
         <section className="card convo-list">
@@ -146,27 +148,50 @@ export default function Messages({ go, me, params, refreshCounts }) {
           {selectedId && !c && !chat.error && <p className="muted">Loading…</p>}
           {selectedId && c && (
             <>
-              <div className="chat-header">
-                <button className="link back-to-list" onClick={() => go('messages', { tab })}>
-                  ← Chats
-                </button>
-                <div>
-                  <h2>
-                    {c.other.name} <DemoBadge student={c.other} />
-                  </h2>
-                  {activeLabel(c.other.last_active_at) && <ActiveDot lastActive={c.other.last_active_at} />}
-                </div>
-                <div className="row">
-                  {c.state !== 'blocked' && (
-                    <button className="link" onClick={() => go('setupMeetup', { partnerId: selectedId })}>
-                      Schedule a meetup →
-                    </button>
-                  )}
-                  <button className="link muted-link" onClick={() => go('blockReport', { studentId: selectedId })}>
-                    Block / report
+              <ChatBar
+                onBack={() => back('messages', { tab })}
+                backLabel="Back to chats"
+                icon={<Avatar name={c.other.name} color={c.other.color} small />}
+                title={c.other.name}
+                subtitle={
+                  <>
+                    <DemoBadge student={c.other} />
+                    {activeLabel(c.other.last_active_at) && <ActiveDot lastActive={c.other.last_active_at} />}
+                  </>
+                }
+              >
+                {c.state !== 'blocked' && (
+                  <button className="secondary small" aria-label={`Schedule a meetup with ${c.other.name.split(' ')[0]}`} onClick={() => go('setupMeetup', { partnerId: selectedId })}>
+                    Schedule
                   </button>
-                </div>
-              </div>
+                )}
+                <MoreMenu label={`More options for ${c.other.name}`}>
+                  {otherProfile && <button onClick={() => profileRef.current.showModal()}>View profile</button>}
+                  <button className="danger" onClick={() => go('blockReport', { studentId: selectedId })}>
+                    Block or report
+                  </button>
+                </MoreMenu>
+              </ChatBar>
+              {otherProfile && (
+                <Dialog
+                  dialogRef={profileRef}
+                  titleId="profile-title"
+                  title={
+                    <div className="person-head">
+                      <Avatar name={otherProfile.full_name} color={otherProfile.avatar_color} />
+                      <div className="person-head-text">
+                        <h2>{otherProfile.full_name}</h2>
+                        <p className="person-meta">
+                          <span className={`badge ${otherProfile.program_status}`}>{programLabel(otherProfile.program_status)}</span>
+                          <ActiveDot lastActive={c.other.last_active_at} />
+                        </p>
+                      </div>
+                    </div>
+                  }
+                >
+                  {hasProfileDetails(otherProfile) ? <ProfileDetails student={otherProfile} /> : <p className="muted">They haven't filled in their profile yet.</p>}
+                </Dialog>
+              )}
 
               {c.state === 'request_in' && (
                 <div className="notice request-banner">
