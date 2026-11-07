@@ -146,10 +146,10 @@ export function DemoBadge({ student }) {
   )
 }
 
-export function PageHeader({ title, text, className = '' }) {
+export function PageHeader({ title, text, className = '', eyebrow = 'Your I.S. community' }) {
   return (
     <header className={`page-header ${className}`}>
-      <p className="eyebrow">Your I.S. community</p>
+      <p className="eyebrow">{eyebrow}</p>
       <h1>{title}</h1>
       {text && <p className="muted">{text}</p>}
     </header>

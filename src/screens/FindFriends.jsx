@@ -5,13 +5,10 @@ import { STUDENT_SELECT, scoreStudents } from '../matching.js'
 import { ActiveDot, Avatar, DemoBadge, MoreMenu, PageHeader, ProfileDetails, hasProfileDetails, inviteClassmate, programLabel } from '../ui.jsx'
 
 export default function FindFriends({ go, me, params, showToast, refreshCounts }) {
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [program, setProgram] = useState('all')
   const [course, setCourse] = useState('all')
-  const [skill, setSkill] = useState('all')
-  const [freeMatch, setFreeMatch] = useState(Boolean(params.freeMatch))
   const [show, setShow] = useState(params.show ?? 'all') // 'all' | 'friends' | 'requests'
-  const [sort, setSort] = useState('match')
   const [busyId, setBusyId] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [queuePick, setQueuePick] = useState('')
@@ -43,19 +40,10 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     .filter(
       (s) =>
         (!q || s.full_name.toLowerCase().includes(q)) &&
-        (program === 'all' || s.program_status === program) &&
         (course === 'all' || s.student_courses.some((c) => String(c.course_id) === course)) &&
-        (skill === 'all' || s.student_skills.some((k) => String(k.skill_id) === skill)) &&
-        (!freeMatch || s.shared.length > 0) &&
         (show === 'all' || (show === 'friends' && s.friendship?.status === 'accepted') || (show === 'requests' && requests.includes(s))),
     )
-    .sort((a, b) =>
-      sort === 'match'
-        ? b.score - a.score || new Date(b.last_active_at ?? 0) - new Date(a.last_active_at ?? 0)
-        : sort === 'active'
-          ? new Date(b.last_active_at ?? 0) - new Date(a.last_active_at ?? 0)
-          : new Date(b.created_at) - new Date(a.created_at),
-    )
+    .sort((a, b) => b.score - a.score || new Date(b.last_active_at ?? 0) - new Date(a.last_active_at ?? 0))
 
   async function act(studentId, fn, args, toastText) {
     setBusyId(studentId)
@@ -208,7 +196,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
 
   return (
     <>
-      <PageHeader title="Find someone to learn with." text="Best matches first: shared classes, strengths that cover your needs, and time you're both free." />
+      <PageHeader eyebrow="Your IS community" title="Find someone to learn with." text="Find a friend, then schedule a meetup to grow together!" />
 
       <div className="segmented" role="tablist">
         {[
@@ -223,19 +211,16 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
       </div>
 
       <div className="filters">
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…" aria-label="Search by name" />
-        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
-          <option value="match">Best match</option>
-          <option value="active">Recently active</option>
-          <option value="new">Newest</option>
-        </select>
-        <select value={program} onChange={(e) => setProgram(e.target.value)} aria-label="Program filter">
-          <option value="all">Any program</option>
-          <option value="pre_is">Pre-IS</option>
-          <option value="is_core">IS Core</option>
-          <option value="is_minor">IS Minor</option>
-          <option value="ta">TA / Mentor</option>
-        </select>
+        <form
+          className="find-search"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setSearch(searchInput)
+          }}
+        >
+          <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search by name..." aria-label="Search by name" />
+          <button className="primary" type="submit">Enter</button>
+        </form>
         <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Class filter">
           <option value="all">Any class</option>
           {lists.data.courses.map((c) => (
@@ -244,34 +229,13 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
             </option>
           ))}
         </select>
-        <select value={skill} onChange={(e) => setSkill(e.target.value)} aria-label="Strong in">
-          <option value="all">Strong in anything</option>
-          {lists.data.skills.map((k) => (
-            <option key={k.id} value={k.id}>
-              Strong in {k.name}
-            </option>
-          ))}
-        </select>
-        <label className="check">
-          <input type="checkbox" checked={freeMatch} onChange={(e) => setFreeMatch(e.target.checked)} />
-          Free when I'm free
-        </label>
       </div>
-
-      {freeMatch && myRow.availability_slots.length === 0 && (
-        <p className="notice">
-          Set your free times first.{' '}
-          <button className="link" onClick={() => go('calendar')}>
-            Open Availability →
-          </button>
-        </p>
-      )}
       {actionError && <p className="error">{actionError}</p>}
 
       {shown.length === 0 && (
         <section className="card empty">
-          <h2>No one matches those filters</h2>
-          <p className="muted">Try fewer filters, or let us match you below. You can also invite a classmate.</p>
+          <h2>No one matches your search</h2>
+          <p className="muted">Try another name or class, or let us match you below. You can also invite a classmate.</p>
           <button className="secondary" onClick={async () => showToast({ text: await inviteClassmate() })}>
             Invite a classmate
           </button>
