@@ -75,7 +75,7 @@ export default function Resources({ me, showToast }) {
   return (
     <>
       <div className="resources-heading">
-        <PageHeader title="Learn from each other." text="Study guides, notes and practice sets made by students, for students." />
+        <PageHeader eyebrow="Your IS community" title="Learn from each other." text="Study guides, notes and practice sets made by students, for students." />
         {!sharing && (
           <button className="primary" onClick={() => setSharing(true)}>
             + Share a study guide
