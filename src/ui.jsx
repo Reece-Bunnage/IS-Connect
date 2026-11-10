@@ -1,5 +1,5 @@
 // Small pieces shared by several screens.
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 export const NAV = [
   { id: 'home', icon: 'home', label: 'Home' },
@@ -69,6 +69,8 @@ const ICON_PATHS = {
     </>
   ),
   bulb: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z" />,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  logout: <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M10 16l-4-4 4-4M6 12h10" />,
 }
 
 export function Icon({ name, size = 18 }) {
@@ -87,6 +89,82 @@ export function badgeCount(item, counts) {
   if (!item.badge || !counts) return 0
   if (item.badge === 'messages') return (counts.unread_messages ?? 0) + (counts.message_requests ?? 0)
   return counts[item.badge] ?? 0
+}
+
+// The pages that get their own tab on phones; every other nav item goes
+// under "More".
+export const TABS = ['home', 'findFriends', 'messages', 'meetups']
+
+// Phones only (the desktop sidebar covers these): a tab bar along the bottom
+// of the screen, like most social apps. "More" opens a sheet with the rest of
+// the pages and Log out.
+export function TabBar({ nav, active, counts, go, username, onLogOut }) {
+  const sheetRef = useRef(null)
+  const titleId = useId()
+  const tabs = TABS.map((id) => nav.find((n) => n.id === id))
+  const rest = nav.filter((n) => !TABS.includes(n.id))
+  const moreCount = rest.reduce((sum, n) => sum + badgeCount(n, counts), 0)
+
+  function open(id) {
+    sheetRef.current.close()
+    go(id)
+  }
+
+  return (
+    <>
+      <nav className="tabbar" aria-label="Main">
+        {tabs.map((n) => {
+          const count = badgeCount(n, counts)
+          return (
+            <button key={n.id} className={`tab ${active === n.id ? 'on' : ''}`} aria-current={active === n.id ? 'page' : undefined} onClick={() => go(n.id)}>
+              <Icon name={n.icon} size={22} />
+              {n.short ?? n.label}
+              {count > 0 && <span className="count">{count}</span>}
+            </button>
+          )
+        })}
+        <button className={`tab ${rest.some((n) => n.id === active) ? 'on' : ''}`} aria-haspopup="dialog" onClick={() => sheetRef.current.showModal()}>
+          <Icon name="menu" size={22} />
+          More
+          {moreCount > 0 && <span className="count">{moreCount}</span>}
+        </button>
+      </nav>
+
+      <dialog ref={sheetRef} className="sheet" aria-labelledby={titleId} onClick={(e) => e.target === e.currentTarget && e.currentTarget.close()}>
+        <div className="sheet-body">
+          <div className="survey-dialog-head">
+            <h2 id={titleId}>More</h2>
+            <button type="button" className="close-button" aria-label="Close" onClick={() => sheetRef.current.close()}>
+              ×
+            </button>
+          </div>
+          <nav className="sheet-links" aria-label="More pages">
+            {rest.map((n) => {
+              const count = badgeCount(n, counts)
+              return (
+                <button key={n.id} className={`nav-item ${active === n.id ? 'on' : ''}`} aria-current={active === n.id ? 'page' : undefined} onClick={() => open(n.id)}>
+                  <Icon name={n.icon} /> {n.label}
+                  {count > 0 && <span className="count">{count}</span>}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="sheet-account">
+            <span className="muted">Signed in as @{username}</span>
+            <button
+              className="nav-item"
+              onClick={() => {
+                sheetRef.current.close()
+                onLogOut()
+              }}
+            >
+              <Icon name="logout" /> Log out
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </>
+  )
 }
 
 export const PROGRAMS = [

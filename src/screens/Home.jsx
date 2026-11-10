@@ -4,10 +4,7 @@ import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
 import { formatSlot, formatWhen, googleCalendarLink } from '../time.js'
 import { tipOfTheDay } from '../tips.js'
-import { Avatar, CompletenessMeter, Icon, NAV, badgeCount, inviteClassmate, programLabel } from '../ui.jsx'
-
-// Phone only (the desktop sidebar covers these): 4 quick actions, then the rest as links.
-const QUICK = ['findFriends', 'messages', 'calendar', 'resources']
+import { Avatar, CompletenessMeter, Icon, inviteClassmate, programLabel } from '../ui.jsx'
 
 function firstName(name) {
   return name.split(' ')[0]
@@ -31,7 +28,7 @@ function dayWord(value) {
 // Home, following the redesign mockup: greeting with one primary action,
 // things waiting on you, your next meetup, partners who are free when you
 // are, and a quieter side rail (profile strength, tip, new study guides).
-export default function Home({ go, me, counts, refreshCounts, showToast }) {
+export default function Home({ go, me, refreshCounts, showToast }) {
   const [busy, setBusy] = useState(null)
 
   const students = useQuery(() => supabase.from('students').select(STUDENT_SELECT), [])
@@ -179,9 +176,6 @@ export default function Home({ go, me, counts, refreshCounts, showToast }) {
     )
   }
 
-  const quick = NAV.filter((n) => QUICK.includes(n.id)).sort((a, b) => QUICK.indexOf(a.id) - QUICK.indexOf(b.id))
-  const more = NAV.filter((n) => n.id !== 'home' && !QUICK.includes(n.id))
-
   return (
     <div className="home">
       <section className="greeting">
@@ -245,32 +239,6 @@ export default function Home({ go, me, counts, refreshCounts, showToast }) {
               </article>
             )}
           </section>
-
-          <nav className="quick-actions" aria-label="Quick actions">
-            <div className="quick-grid">
-              {quick.map((n) => {
-                const count = badgeCount(n, counts)
-                return (
-                  <button key={n.id} className="quick" onClick={() => go(n.id)}>
-                    <Icon name={n.icon} size={22} />
-                    {n.short}
-                    {count > 0 && <span className="count">{count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="more-links">
-              {more.map((n) => {
-                const count = badgeCount(n, counts)
-                return (
-                  <button key={n.id} className="pill-link" onClick={() => go(n.id)}>
-                    {n.label}
-                    {count > 0 && <span className="count">{count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
 
           <section>
             <div className="section-head">

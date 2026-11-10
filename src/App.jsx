@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
 import { forgetSession, logOut as endSession, restoreSession } from './auth.js'
 import { rpc, usePolling } from './api.js'
-import { Icon, NAV, NAV_PARENT, NeedsProfile, Toast, badgeCount } from './ui.jsx'
+import { Icon, NAV, NAV_PARENT, NeedsProfile, TabBar, Toast, badgeCount } from './ui.jsx'
 import Login from './screens/Login.jsx'
 import Home from './screens/Home.jsx'
 import CreateProfile from './screens/CreateProfile.jsx'
@@ -184,9 +184,14 @@ export default function App() {
   const active = NAV_PARENT[screen] ?? screen
   const nav = session?.is_admin ? [...NAV, { id: 'reports', icon: 'doc', label: 'Reports (admin)' }] : NAV
   const notificationCount = counts?.notifications ?? 0
+  const hasNav = Boolean(session && profile)
+  // An open chat keeps the whole phone screen, like a messaging app: its own
+  // ‹ button goes back to the list, so the tab bar steps aside.
+  const inChat = (screen === 'messages' && params.studentId) || (screen === 'groups' && params.groupId)
+  const hasTabBar = hasNav && !inChat
 
   return (
-    <div className={`app ${session ? 'signed-in' : ''}`}>
+    <div className={`app ${session ? 'signed-in' : ''} ${hasNav ? 'has-nav' : ''} ${hasTabBar ? 'has-tabbar' : ''}`}>
       <header className="topbar">
         <button className="brand" onClick={() => go('home')}>
           <span className="logo">IS</span> IS-Connect
@@ -212,15 +217,15 @@ export default function App() {
               </button>
             )}
             <span className="muted">@{session.username}</span>
-            <button className="link" onClick={logOut}>
+            <button className="link logout" onClick={logOut}>
               Log out
             </button>
           </div>
         )}
       </header>
 
-      <div className={`layout ${session && profile ? 'has-sidebar' : ''}`}>
-        {session && profile && (
+      <div className={`layout ${hasNav ? 'has-sidebar' : ''}`}>
+        {hasNav && (
           <nav className="sidebar" aria-label="Main">
             {nav.map((item) => {
               const n = badgeCount(item, counts)
@@ -240,6 +245,7 @@ export default function App() {
         )}
         <main className="content">{content}</main>
       </div>
+      {hasTabBar && <TabBar nav={nav} active={active} counts={counts} go={go} username={session.username} onLogOut={logOut} />}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   )
