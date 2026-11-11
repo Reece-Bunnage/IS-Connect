@@ -929,6 +929,43 @@ begin
   return coalesce((select json_agg(resource_id) from saved_resources where student_id = v_me), '[]'::json);
 end $$;
 
+-- Return each guide's like count and whether the current student liked it.
+create or replace function study_resource_likes(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_me uuid := _session_student(p_token);
+begin
+  return coalesce((
+    select json_agg(json_build_object(
+      'resource_id', r.id,
+      'like_count', coalesce(l.like_count, 0),
+      'liked_by_me', exists (
+        select 1 from resource_likes mine where mine.resource_id = r.id and mine.student_id = v_me
+      )
+    ))
+    from study_resources r
+    left join (
+      select resource_id, count(*)::int as like_count
+      from resource_likes group by resource_id
+    ) l on l.resource_id = r.id
+  ), '[]'::json);
+end $$;
+
+-- Toggle the current student's thumbs-up for a guide. Returns its new state.
+create or replace function toggle_resource_like(p_token uuid, p_resource_id bigint) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  v_me uuid := _session_student(p_token);
+begin
+  if not exists (select 1 from study_resources where id = p_resource_id) then
+    raise exception 'Study guide not found.';
+  end if;
+  delete from resource_likes where student_id = v_me and resource_id = p_resource_id;
+  if found then return false; end if;
+  insert into resource_likes (student_id, resource_id) values (v_me, p_resource_id);
+  return true;
+end $$;
+
 create or replace function report_resource(p_token uuid, p_resource_id bigint, p_reason text) returns void
 language plpgsql security definer set search_path = public as $$
 declare
