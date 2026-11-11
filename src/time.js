@@ -102,6 +102,16 @@ export function freeAt(slots = [], date, minutes = 60) {
   )
 }
 
+// When a weekly free time ({ day_of_week, start_time }) next starts, as a
+// Date: later today if it hasn't started yet, otherwise its next week day.
+export function nextStart(slot, now = new Date()) {
+  const minutes = toMinutes(slot.start_time)
+  for (let i = 0; i <= 7; i++) {
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, Math.floor(minutes / 60), minutes % 60)
+    if (weekday(at) === slot.day_of_week && at > now) return at
+  }
+}
+
 // The next 7 days (today first), as midnight Dates.
 export function nextSevenDays(now = new Date()) {
   return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i))

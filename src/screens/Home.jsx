@@ -2,17 +2,12 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { formatSlot, formatWhen, googleCalendarLink } from '../time.js'
+import { formatSlot, formatWhen, googleCalendarLink, nextStart, toLocalInput } from '../time.js'
 import { tipOfTheDay } from '../tips.js'
 import { Avatar, CompletenessMeter, Icon, inviteClassmate, programLabel } from '../ui.jsx'
 
 function firstName(name) {
   return name.split(' ')[0]
-}
-
-// Course codes with the ones you share listed first.
-function sharedFirst(codes, mine) {
-  return [...codes].sort((a, b) => mine.has(b) - mine.has(a) || a.localeCompare(b))
 }
 
 // "today", "tomorrow", "Wednesday", or "Oct 15".
@@ -26,8 +21,9 @@ function dayWord(value) {
 }
 
 // Home, following the redesign mockup: greeting with one primary action,
-// things waiting on you, your next meetup, partners who are free when you
-// are, and a quieter side rail (profile strength, tip, new study guides).
+// things waiting on you, your next meetup, friends free when you are (or new
+// people to meet), and a quieter side rail (profile strength, tip, new study
+// guides).
 export default function Home({ go, me, refreshCounts, showToast }) {
   const [busy, setBusy] = useState(null)
 
@@ -64,11 +60,20 @@ export default function Home({ go, me, refreshCounts, showToast }) {
 
   const next = (meetups.data ?? []).find((m) => new Date(m.scheduled_at) > now && (m.status === 'confirmed' || (m.status === 'requested' && m.i_asked)))
 
-  // Suggested partners: people free when you are first, then best match.
+  // Study partners. Friends who share a free time come first, soonest first,
+  // so you can plan a session. Without any, suggest new people: free when
+  // you are first, then best match.
   const myRow = byId.get(me.id)
   const scored = students.data ? scoreStudents(students.data, me.id, hidden) : []
-  const hasFreeTogether = scored.some((s) => s.shared.length > 0)
-  const partners = scored
+  const friendIds = new Set((friendships.data ?? []).filter((f) => f.status === 'accepted').map((f) => f.other_id))
+  const friendsFree = scored
+    .filter((s) => friendIds.has(s.id) && s.shared.length > 0)
+    .map((s) => ({ ...s, soonest: s.shared.map((slot) => ({ slot, at: nextStart(slot) })).sort((a, b) => a.at - b.at)[0] }))
+    .sort((a, b) => a.soonest.at - b.soonest.at)
+    .slice(0, 3)
+  const newPeople = scored.filter((s) => !friendIds.has(s.id))
+  const hasFreeTogether = newPeople.some((s) => s.shared.length > 0)
+  const partners = newPeople
     .filter((s) => s.score > 0)
     .sort((a, b) => (b.shared.length > 0) - (a.shared.length > 0) || b.score - a.score)
     .slice(0, 3)
@@ -242,13 +247,66 @@ export default function Home({ go, me, refreshCounts, showToast }) {
 
           <section>
             <div className="section-head">
-              <h2>{hasFreeTogether ? "Free when you're free" : 'Suggested for you'}</h2>
+              <div>
+                <h2>{friendsFree.length > 0 ? 'Friends free when you are' : 'Find your study people'}</h2>
+                {friendsFree.length === 0 && <p className="meta">Matched on your classes, what you need help with, and your free times.</p>}
+              </div>
               <button className="text-link" onClick={() => go('findFriends', hasFreeTogether ? { freeMatch: true } : {})}>
-                See all students →
+                {friendsFree.length > 0 ? 'More people to meet →' : 'See all students →'}
               </button>
             </div>
-            {!students.data && <p className="meta">Loading…</p>}
-            {students.data && partners.length === 0 && (
+            {(!students.data || !friendships.data) && <p className="meta">Loading…</p>}
+            {students.data && friendships.data && friendsFree.length > 0 && (
+              <div className="home-card people-rows">
+                {friendsFree.map((s) => (
+                  <div key={s.id} className="person-line">
+                    <Avatar name={s.full_name} color={s.avatar_color} />
+                    <div className="person-line-text">
+                      <p className="strong">{s.full_name}</p>
+                      <p className="free-line">
+                        <Icon name="clock" size={14} />
+                        Free together {formatSlot(s.soonest.slot)}
+                      </p>
+                    </div>
+                    <button
+                      className="outline"
+                      aria-label={`Plan a study session with ${s.full_name}`}
+                      onClick={() => go('setupMeetup', { partnerId: s.id, at: toLocalInput(s.soonest.at) })}
+                    >
+                      Plan
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {students.data && friendships.data && friendsFree.length === 0 && partners.length > 0 && (
+              <div className="home-card people-rows">
+                {partners.map((s) => {
+                  const detail = s.reasons.find((r) => !r.startsWith('Free together'))
+                  return (
+                    <div key={s.id} className="person-line">
+                      <Avatar name={s.full_name} color={s.avatar_color} />
+                      <div className="person-line-text">
+                        <p className="strong">
+                          {s.full_name} <span className={`badge ${s.program_status}`}>{programLabel(s.program_status)}</span>
+                        </p>
+                        {detail && <p className="meta">{detail}</p>}
+                        {s.shared.length > 0 && (
+                          <p className="free-line">
+                            <Icon name="clock" size={14} />
+                            Free together {formatSlot(s.shared[0])}
+                          </p>
+                        )}
+                      </div>
+                      <button className="outline" aria-label={`Say hi to ${s.full_name}`} onClick={() => go('messages', { studentId: s.id })}>
+                        Say hi
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {students.data && friendships.data && friendsFree.length === 0 && partners.length === 0 && (
               <article className="home-card empty-row">
                 <p className="meta">Add your classes, needs and free times to get suggestions.</p>
                 <button className="text-link" onClick={() => go(myRow?.availability_slots?.length ? 'createProfile' : 'calendar')}>
@@ -256,35 +314,6 @@ export default function Home({ go, me, refreshCounts, showToast }) {
                 </button>
               </article>
             )}
-            <div className="partner-grid">
-              {partners.map((s) => {
-                const detail = s.reasons.filter((r) => !r.startsWith('Free together'))[0]
-                return (
-                  <article key={s.id} className="home-card partner-card">
-                    <div className="partner-head">
-                      <Avatar name={s.full_name} color={s.avatar_color} />
-                      <div>
-                        <p className="strong">{s.full_name}</p>
-                        <p className="meta">
-                          <span className={`badge ${s.program_status}`}>{programLabel(s.program_status)}</span>{' '}
-                          {sharedFirst(s.student_courses.map((c) => c.courses.code), myCourses)[0]}
-                        </p>
-                      </div>
-                    </div>
-                    {detail && <p className="meta">{detail}</p>}
-                    {s.shared.length > 0 && (
-                      <p className="free-line">
-                        <Icon name="clock" size={14} />
-                        Free together {formatSlot(s.shared[0])}
-                      </p>
-                    )}
-                    <button className="outline" onClick={() => go('messages', { studentId: s.id })}>
-                      Say hi
-                    </button>
-                  </article>
-                )
-              })}
-            </div>
           </section>
         </div>
 
