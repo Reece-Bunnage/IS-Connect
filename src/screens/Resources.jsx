@@ -25,11 +25,13 @@ export default function Resources({ me, showToast }) {
   )
   const courses = useQuery(() => supabase.from('courses').select('code').order('code'), [])
   const saved = useRpc('my_saved_resource_ids', {}, [me.id])
+  const likes = useRpc('study_resource_likes', {}, [me.id])
 
   if (resources.error) return <p className="error">Could not load study resources: {resources.error}</p>
   if (!resources.data || !courses.data) return <p className="muted">Loading study resources…</p>
 
   const savedIds = new Set(saved.data ?? [])
+  const likesByResource = new Map((likes.data ?? []).map((like) => [Number(like.resource_id), like]))
   const myCourses = new Set(me.student_courses.map((c) => c.courses.code))
   const q = search.trim().toLowerCase()
   const shown = resources.data.filter(
@@ -191,6 +193,14 @@ export default function Resources({ me, showToast }) {
                 onClick={() => run('toggle_saved_resource', { p_resource_id: r.id }, saved.reload)}
               >
                 {savedIds.has(r.id) ? '★ Saved' : '☆ Save'}
+              </button>
+              <button
+                className={`secondary small ${likesByResource.get(r.id)?.liked_by_me ? 'on' : ''}`}
+                aria-label={`${likesByResource.get(r.id)?.liked_by_me ? 'Unlike' : 'Like'} ${r.title}`}
+                aria-pressed={Boolean(likesByResource.get(r.id)?.liked_by_me)}
+                onClick={() => run('toggle_resource_like', { p_resource_id: r.id }, likes.reload)}
+              >
+                👍 {likesByResource.get(r.id)?.like_count ?? 0}
               </button>
               {r.uploader_id === me.id ? (
                 <button className="link small" onClick={() => run('delete_resource', { p_resource_id: r.id }, resources.reload)}>
