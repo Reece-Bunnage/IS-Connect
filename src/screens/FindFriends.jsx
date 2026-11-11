@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { ActiveDot, Avatar, DemoBadge, MoreMenu, PageHeader, ProfileDetails, hasProfileDetails, inviteClassmate, programLabel } from '../ui.jsx'
+import { ActiveDot, Avatar, DemoBadge, MoreMenu, PageHeader, ProfileDetails, arrowKeys, hasProfileDetails, inviteClassmate, programLabel, tabProps } from '../ui.jsx'
 
 export default function FindFriends({ go, me, params, showToast, refreshCounts }) {
   const [searchInput, setSearchInput] = useState('')
@@ -198,13 +198,13 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     <>
       <PageHeader eyebrow="Your IS community" title="Find someone to learn with." text="Find a friend, then schedule a meetup to grow together!" />
 
-      <div className="segmented" role="tablist">
+      <div className="segmented" role="tablist" aria-label="Show" onKeyDown={arrowKeys({ select: true })}>
         {[
           ['all', 'All students'],
           ['friends', 'My friends'],
           ['requests', `Requests${requests.length ? ` (${requests.length})` : ''}`],
         ].map(([id, label]) => (
-          <button key={id} className={show === id ? 'on' : ''} onClick={() => setShow(id)}>
+          <button key={id} {...tabProps(show === id)} className={show === id ? 'on' : ''} onClick={() => setShow(id)}>
             {label}
           </button>
         ))}

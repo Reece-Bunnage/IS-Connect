@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, usePolling, useQuery, useRpc } from '../api.js'
-import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader, ProfileDetails, activeLabel, hasProfileDetails, programLabel } from '../ui.jsx'
+import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader, ProfileDetails, activeLabel, arrowKeys, hasProfileDetails, programLabel, tabProps } from '../ui.jsx'
 
 // Conversation suggestions so a nervous first message isn't a blank box.
 function icebreakers(me, other) {
@@ -97,11 +97,11 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
 
       <div className={`messages-layout ${selectedId ? 'has-chat' : ''}`}>
         <section className="card convo-list">
-          <div className="segmented">
-            <button className={tab === 'chats' ? 'on' : ''} onClick={() => setTab('chats')}>
+          <div className="segmented" role="tablist" aria-label="Inbox" onKeyDown={arrowKeys({ select: true })}>
+            <button {...tabProps(tab === 'chats')} className={tab === 'chats' ? 'on' : ''} onClick={() => setTab('chats')}>
               Chats
             </button>
-            <button className={tab === 'requests' ? 'on' : ''} onClick={() => setTab('requests')}>
+            <button {...tabProps(tab === 'requests')} className={tab === 'requests' ? 'on' : ''} onClick={() => setTab('requests')}>
               Requests{requests.length > 0 && <span className="count">{requests.length}</span>}
             </button>
           </div>

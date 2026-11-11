@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
 import { formatHour, formatWhen, freeAt, freeHoursOn, nextSevenDays, toLocalInput } from '../time.js'
-import { Avatar, DemoBadge, Icon, PageHeader, programLabel } from '../ui.jsx'
+import { Avatar, DemoBadge, Icon, PageHeader, arrowKeys, programLabel, tabProps } from '../ui.jsx'
 
 const DURATIONS = [
   [30, '30 minutes'],
@@ -332,13 +332,13 @@ function WhenStep({ go, open, mySlots, partner, invitable }) {
             {partner ? `${first} hasn't saved any free times for the next week.` : 'No one has saved free times for the next week yet.'} Pick a time below.
           </p>
         )}
-        <div className="day-tabs">
+        <div className="day-tabs" role="tablist" aria-label="Day" onKeyDown={arrowKeys({ select: true })}>
           {days.map((d, i) => (
             <button
               key={d.key}
               type="button"
               className={`day-tab ${d.key === dayKey ? 'on' : ''} ${d.hours.length ? '' : 'empty'}`}
-              aria-pressed={d.key === dayKey}
+              {...tabProps(d.key === dayKey)}
               aria-label={dayLabel(d)}
               onClick={() => setDayKey(d.key)}
             >

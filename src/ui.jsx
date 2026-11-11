@@ -91,6 +91,35 @@ export function badgeCount(item, counts) {
   return counts[item.badge] ?? 0
 }
 
+// Keyboard: arrow keys move between the buttons in a group, following the
+// W3C patterns for tabs, radio buttons and menus. ←/→ (↑/↓ with `vertical`,
+// all four with `both`); Home/End jump to the ends; it wraps around. With
+// `select`, moving also picks the item, as tabs and radio buttons do (pair
+// it with tabProps so the whole group is one Tab stop). Elsewhere, arrow
+// keys keep scrolling the page.
+export function arrowKeys({ vertical = false, both = false, select = false } = {}) {
+  const back = both ? ['ArrowLeft', 'ArrowUp'] : [vertical ? 'ArrowUp' : 'ArrowLeft']
+  const forward = both ? ['ArrowRight', 'ArrowDown'] : [vertical ? 'ArrowDown' : 'ArrowRight']
+  return (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+    const step = back.includes(e.key) ? -1 : forward.includes(e.key) ? 1 : 0
+    if (!step && e.key !== 'Home' && e.key !== 'End') return
+    const items = [...e.currentTarget.querySelectorAll('button:not(:disabled)')]
+    const i = items.indexOf(document.activeElement)
+    if (i === -1) return
+    e.preventDefault()
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + step + items.length) % items.length
+    items[to].focus()
+    if (select) items[to].click()
+  }
+}
+
+// One tab in a role="tablist": only the chosen tab is a Tab stop; arrow
+// keys (arrowKeys with select) move between them.
+export function tabProps(selected) {
+  return { role: 'tab', 'aria-selected': selected, tabIndex: selected ? 0 : -1 }
+}
+
 // The pages that get their own tab on phones; every other nav item goes
 // under "More".
 export const TABS = ['home', 'findFriends', 'messages', 'meetups']
@@ -112,7 +141,7 @@ export function TabBar({ nav, active, counts, go, username, onLogOut }) {
 
   return (
     <>
-      <nav className="tabbar" aria-label="Main">
+      <nav className="tabbar" aria-label="Main" onKeyDown={arrowKeys()}>
         {tabs.map((n) => {
           const count = badgeCount(n, counts)
           return (
@@ -131,7 +160,7 @@ export function TabBar({ nav, active, counts, go, username, onLogOut }) {
       </nav>
 
       <dialog ref={sheetRef} className="sheet" aria-labelledby={titleId} onClick={(e) => e.target === e.currentTarget && e.currentTarget.close()}>
-        <div className="sheet-body">
+        <div className="sheet-body" onKeyDown={arrowKeys({ vertical: true })}>
           <div className="survey-dialog-head">
             <h2 id={titleId}>More</h2>
             <button type="button" className="close-button" aria-label="Close" onClick={() => sheetRef.current.close()}>
@@ -180,6 +209,17 @@ export function programLabel(status) {
 
 // Dark enough for white initials (all at least 4.5:1).
 export const AVATAR_COLORS = ['#24543f', '#2f4fb5', '#7a3fa0', '#a8431f', '#1f6f78', '#b0306a', '#8a5a00', '#4a4f57']
+// What screen readers say for each color (instead of the hex code).
+export const COLOR_NAMES = {
+  '#24543f': 'Green',
+  '#2f4fb5': 'Blue',
+  '#7a3fa0': 'Purple',
+  '#a8431f': 'Rust',
+  '#1f6f78': 'Teal',
+  '#b0306a': 'Pink',
+  '#8a5a00': 'Gold',
+  '#4a4f57': 'Gray',
+}
 
 function initials(name) {
   return (name || '?')
@@ -332,6 +372,7 @@ export async function inviteClassmate() {
 
 // A ⋯ button with a small menu of less-used or risky actions. It closes after
 // a choice, when you tap elsewhere, or on Escape (focus goes back to ⋯).
+// Keyboard: ↓/↑ on ⋯ opens it at the first/last item; ↑/↓ move inside.
 export function MoreMenu({ label, children }) {
   const ref = useRef(null)
   useEffect(() => {
@@ -341,6 +382,12 @@ export function MoreMenu({ label, children }) {
       if (e.key === 'Escape' && el.open) {
         el.open = false
         el.querySelector('summary').focus()
+      }
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target.tagName === 'SUMMARY') {
+        e.preventDefault()
+        el.open = true
+        const items = el.querySelectorAll('.menu button:not(:disabled)')
+        items[e.key === 'ArrowDown' ? 0 : items.length - 1]?.focus()
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
@@ -353,7 +400,7 @@ export function MoreMenu({ label, children }) {
   return (
     <details className="more" ref={ref}>
       <summary aria-label={label}>⋯</summary>
-      <div className="menu" onClick={(e) => e.target.closest('button') && (ref.current.open = false)}>
+      <div className="menu" onKeyDown={arrowKeys({ vertical: true })} onClick={(e) => e.target.closest('button') && (ref.current.open = false)}>
         {children}
       </div>
     </details>

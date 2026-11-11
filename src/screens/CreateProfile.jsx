@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useQuery } from '../api.js'
-import { AVATAR_COLORS, Avatar, PROGRAMS } from '../ui.jsx'
+import { AVATAR_COLORS, Avatar, COLOR_NAMES, PROGRAMS, arrowKeys } from '../ui.jsx'
 
 function formFrom(profile) {
   return {
@@ -77,19 +77,25 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
         <Avatar name={form.full_name || '?'} color={form.avatar_color} />
         <div>
           <span className="field-label">Avatar color</span>
-          <div className="swatches" role="radiogroup" aria-label="Avatar color">
-            {AVATAR_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={form.avatar_color === c}
-                aria-label={`Color ${c}`}
-                className={`swatch ${form.avatar_color === c ? 'on' : ''}`}
-                style={{ background: c }}
-                onClick={() => setForm({ ...form, avatar_color: c })}
-              />
-            ))}
+          {/* Radio buttons: one Tab stop (the chosen color), arrow keys pick another. */}
+          <div className="swatches" role="radiogroup" aria-label="Avatar color" onKeyDown={arrowKeys({ both: true, select: true })}>
+            {AVATAR_COLORS.map((c, i) => {
+              const checked = form.avatar_color === c
+              const tabStop = checked || (i === 0 && !AVATAR_COLORS.includes(form.avatar_color))
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={checked}
+                  aria-label={COLOR_NAMES[c]}
+                  tabIndex={tabStop ? 0 : -1}
+                  className={`swatch ${checked ? 'on' : ''}`}
+                  style={{ background: c }}
+                  onClick={() => setForm({ ...form, avatar_color: c })}
+                />
+              )
+            })}
           </div>
         </div>
       </div>

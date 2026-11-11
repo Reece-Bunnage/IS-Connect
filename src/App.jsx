@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
 import { forgetSession, logOut as endSession, restoreSession } from './auth.js'
 import { rpc, usePolling } from './api.js'
-import { Icon, NAV, NAV_PARENT, NeedsProfile, TabBar, Toast, badgeCount } from './ui.jsx'
+import { Icon, NAV, NAV_PARENT, NeedsProfile, TabBar, Toast, arrowKeys, badgeCount } from './ui.jsx'
 import Login from './screens/Login.jsx'
 import Home from './screens/Home.jsx'
 import CreateProfile from './screens/CreateProfile.jsx'
@@ -192,6 +192,11 @@ export default function App() {
 
   return (
     <div className={`app ${session ? 'signed-in' : ''} ${hasNav ? 'has-nav' : ''} ${hasTabBar ? 'has-tabbar' : ''}`}>
+      {/* First Tab stop, shown only when focused: jumps past the header and
+          menu. A button, not <a href="#main">, which would change the page. */}
+      <button className="skip-link" onClick={() => document.getElementById('main').focus()}>
+        Skip to main content
+      </button>
       <header className="topbar">
         <button className="brand" onClick={() => go('home')}>
           <span className="logo">IS</span> IS-Connect
@@ -226,11 +231,16 @@ export default function App() {
 
       <div className={`layout ${hasNav ? 'has-sidebar' : ''}`}>
         {hasNav && (
-          <nav className="sidebar" aria-label="Main">
+          <nav className="sidebar" aria-label="Main" onKeyDown={arrowKeys({ vertical: true })}>
             {nav.map((item) => {
               const n = badgeCount(item, counts)
               return (
-                <button key={item.id} className={`nav-item ${active === item.id ? 'on' : ''}`} onClick={() => go(item.id)}>
+                <button
+                  key={item.id}
+                  className={`nav-item ${active === item.id ? 'on' : ''}`}
+                  aria-current={active === item.id ? 'page' : undefined}
+                  onClick={() => go(item.id)}
+                >
                   <Icon name={item.icon} /> {item.label}
                   {n > 0 && <span className="count">{n}</span>}
                 </button>
@@ -243,7 +253,9 @@ export default function App() {
             </p>
           </nav>
         )}
-        <main className="content">{content}</main>
+        <main id="main" className="content" tabIndex={-1}>
+          {content}
+        </main>
       </div>
       {hasTabBar && <TabBar nav={nav} active={active} counts={counts} go={go} username={session.username} onLogOut={logOut} />}
       <Toast toast={toast} onClose={() => setToast(null)} />
