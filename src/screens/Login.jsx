@@ -3,8 +3,8 @@ import { logIn, resetPassword, signUp } from '../auth.js'
 
 // Username + password login. The login is saved in the database, and this
 // browser remembers it, so a refresh keeps you logged in.
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'forgot'
+export default function Login({ onLogin, initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode) // 'login' | 'signup' | 'forgot'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')

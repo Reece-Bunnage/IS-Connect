@@ -4,6 +4,8 @@ import { forgetSession, logOut as endSession, restoreSession } from './auth.js'
 import { rpc, usePolling } from './api.js'
 import { Icon, NAV, NAV_PARENT, NeedsProfile, TabBar, Toast, arrowKeys, badgeCount } from './ui.jsx'
 import Login from './screens/Login.jsx'
+import Welcome from './screens/Welcome.jsx'
+import GuidedTour, { tourWasSeen } from './GuidedTour.jsx'
 import Home from './screens/Home.jsx'
 import CreateProfile from './screens/CreateProfile.jsx'
 import MyProfile from './screens/MyProfile.jsx'
@@ -62,6 +64,9 @@ export default function App() {
   const [profileError, setProfileError] = useState(null)
   const [counts, setCounts] = useState(null)
   const [toast, setToast] = useState(null)
+  const [authMode, setAuthMode] = useState(null)
+  const [tourOpen, setTourOpen] = useState(false)
+  const [tourCheckedFor, setTourCheckedFor] = useState(null)
 
   // Back/forward (button or swipe) changes the URL; show the screen it names.
   useEffect(() => {
@@ -79,6 +84,12 @@ export default function App() {
   }, [])
 
   const userId = session?.user_id
+
+  useEffect(() => {
+    if (!userId || !profile || tourCheckedFor === userId) return
+    setTourCheckedFor(userId)
+    if (!tourWasSeen(userId)) setTourOpen(true)
+  }, [userId, profile, tourCheckedFor])
 
   // Your own row in `students`, read fresh from the database.
   const reloadProfile = useCallback(async () => {
@@ -144,6 +155,9 @@ export default function App() {
   async function logOut() {
     await endSession()
     setSession(null)
+    setAuthMode(null)
+    setTourOpen(false)
+    setTourCheckedFor(null)
     setCounts(null)
     go('home', {}, { replace: true })
   }
@@ -151,6 +165,9 @@ export default function App() {
   function accountDeleted() {
     forgetSession()
     setSession(null)
+    setAuthMode(null)
+    setTourOpen(false)
+    setTourCheckedFor(null)
     setCounts(null)
     go('home', {}, { replace: true })
   }
@@ -174,7 +191,9 @@ export default function App() {
 
   let content
   if (session === undefined) content = <p className="muted">Loading…</p>
-  else if (!session) content = <Login onLogin={setSession} />
+  else if (!session) content = authMode
+    ? <><button className="link welcome-back" onClick={() => setAuthMode(null)}>← Back to welcome</button><Login key={authMode} initialMode={authMode} onLogin={setSession} /></>
+    : <Welcome onStart={setAuthMode} />
   else if (profileError) content = <p className="error">Could not load your profile: {profileError}</p>
   else if (profile === undefined) content = <p className="muted">Loading your profile…</p>
   else if (!profile && screen !== 'createProfile') content = <CreateProfile go={go} profile={null} onSaved={reloadProfile} onboarding />
@@ -191,16 +210,17 @@ export default function App() {
   const hasTabBar = hasNav && !inChat
 
   return (
-    <div className={`app ${session ? 'signed-in' : ''} ${hasNav ? 'has-nav' : ''} ${hasTabBar ? 'has-tabbar' : ''}`}>
+    <div className={`app ${session ? 'signed-in' : !authMode ? 'welcome-app' : ''} ${hasNav ? 'has-nav' : ''} ${hasTabBar ? 'has-tabbar' : ''}`}>
       {/* First Tab stop, shown only when focused: jumps past the header and
           menu. A button, not <a href="#main">, which would change the page. */}
       <button className="skip-link" onClick={() => document.getElementById('main').focus()}>
         Skip to main content
       </button>
       <header className="topbar">
-        <button className="brand" onClick={() => go('home')}>
+        <button className="brand" onClick={() => session ? go('home') : setAuthMode(null)}>
           <span className="logo">IS</span> IS-Connect
         </button>
+        {!session && session !== undefined && <button className="link" onClick={() => setAuthMode(authMode ? null : 'login')}>{authMode ? 'Welcome' : 'Log in'}</button>}
         {session && (
           <div className="row account">
             {screen !== 'home' && (
@@ -221,6 +241,7 @@ export default function App() {
                 {notificationCount > 0 && <span className="count">{notificationCount}</span>}
               </button>
             )}
+            <button className="link" disabled={!profile} onClick={() => setTourOpen(true)}>Help / Tour</button>
             <span className="muted">@{session.username}</span>
             <button className="link logout" onClick={logOut}>
               Log out
@@ -237,6 +258,7 @@ export default function App() {
               return (
                 <button
                   key={item.id}
+                  data-tour={item.id}
                   className={`nav-item ${active === item.id ? 'on' : ''}`}
                   aria-current={active === item.id ? 'page' : undefined}
                   onClick={() => go(item.id)}
@@ -258,6 +280,7 @@ export default function App() {
         </main>
       </div>
       {hasTabBar && <TabBar nav={nav} active={active} counts={counts} go={go} username={session.username} onLogOut={logOut} />}
+      {tourOpen && session && profile && <GuidedTour userId={userId} go={go} onClose={() => setTourOpen(false)} />}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   )
