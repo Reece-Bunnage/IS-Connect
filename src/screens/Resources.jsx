@@ -92,6 +92,9 @@ export default function Resources({ me, showToast }) {
             </div>
           </div>
           <form className="form" onSubmit={share}>
+            <p className="notice">
+              Before sharing a Google Drive file, update its sharing settings so anyone with the link has <strong>Viewer</strong> access. This lets classmates open it without being able to edit it.
+            </p>
             <label>
               Title
               <input value={form.title} onChange={update('title')} placeholder="e.g. IS 201 Exam 2 Review" required />
