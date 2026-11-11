@@ -211,14 +211,14 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
           {sections[step]}
           {error && <p className="error">{error}</p>}
           <div className="row">
-            <button type="submit" className="primary" disabled={saving}>
-              {saving ? 'Saving…' : last ? 'Finish' : 'Next →'}
-            </button>
             {step > 0 && (
               <button type="button" className="secondary" onClick={() => setStep(step - 1)}>
                 ← Back
               </button>
             )}
+            <button type="submit" className="primary" disabled={saving}>
+              {saving ? 'Saving…' : last ? 'Finish' : 'Next →'}
+            </button>
           </div>
         </form>
       </section>
