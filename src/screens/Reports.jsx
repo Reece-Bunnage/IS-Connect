@@ -2,30 +2,52 @@ import { useState } from 'react'
 import { rpc, useRpc } from '../api.js'
 import { PageHeader } from '../ui.jsx'
 
-// OKR 1 ("more students connected") as four numbers, from admin_okr_stats.
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+// Our two objectives and their key results, from admin_okr_stats.
 // Everyone counts, demo students and team accounts included.
-function CommunityStats({ stats }) {
-  const share = (n) => (stats.students ? `${Math.round((100 * n) / stats.students)}%` : '0%')
-  const tiles = [
-    ['Students with a meeting set up', stats.students_with_meeting, `of ${stats.students} students (${share(stats.students_with_meeting)})`],
-    ['Connections', stats.connections, 'accepted friend connections'],
-    ['Students with a friend', stats.students_with_friend, `of ${stats.students} students (${share(stats.students_with_friend)})`],
-    ['Calendar synced', stats.calendar_synced, `of ${stats.calendar_links} calendar link${stats.calendar_links === 1 ? '' : 's'} turned on`],
+function OkrStats({ stats: s }) {
+  const share = (n) => (s.students ? Math.round((100 * n) / s.students) : 0)
+  const gain = s.confidence_gain
+  const objectives = [
+    {
+      title: 'Objective 1: More students connected',
+      results: [
+        ['KR1 · Students with a friend', `${share(s.students_with_friend)}%`, `${s.students_with_friend} of ${s.students} students · ${plural(s.connections, 'connection')}`],
+        ['KR2 · Meetings set up', s.meetings, `both people agreed · ${s.students_with_meeting} students (${share(s.students_with_meeting)}%)`],
+      ],
+    },
+    {
+      title: "Objective 2: Students' knowledge increased",
+      results: [
+        ['KR1 · Study guides shared', s.resources_shared, `shared by ${plural(s.resource_sharers, 'student')}`],
+        [
+          'KR2 · Confidence gain after a study session',
+          gain === null ? '–' : `${gain > 0 ? '+' : ''}${gain}`,
+          gain === null
+            ? 'No surveys yet. Students rate their confidence (1–5) after a meetup.'
+            : `points on a 1–5 scale (${s.confidence_before} → ${s.confidence_after}) from ${plural(s.surveys, 'survey')}`,
+        ],
+      ],
+    },
   ]
-  return (
-    <dl className="okr-tiles">
-      {tiles.map(([label, value, detail]) => (
-        <div key={label} className="okr-tile">
-          <dt>{label}</dt>
-          <dd className="okr-value">{value}</dd>
-          <dd className="okr-detail">{detail}</dd>
-        </div>
-      ))}
-    </dl>
-  )
+  return objectives.map((o) => (
+    <div key={o.title} className="okr-objective">
+      <h3>{o.title}</h3>
+      <dl className="okr-tiles">
+        {o.results.map(([label, value, detail]) => (
+          <div key={label} className="okr-tile">
+            <dt>{label}</dt>
+            <dd className="okr-value">{value}</dd>
+            <dd className="okr-detail">{detail}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  ))
 }
 
-// Admins only: OKR 1 numbers, then reports of students and study guides.
+// Admins only: OKR numbers, then reports of students and study guides.
 // Make someone an admin with `npm run make-admin -- <username>`.
 export default function Reports({ me }) {
   const stats = useRpc('admin_okr_stats', {}, [me.id])
@@ -48,14 +70,14 @@ export default function Reports({ me }) {
 
   return (
     <>
-      <PageHeader title="Reports" text="How connected students are (OKR 1), and reports of students and study guides to review." />
+      <PageHeader title="Reports" text="Progress on our OKRs, and reports of students and study guides to review." />
 
       <section className="okr">
-        <h2>Community (OKR 1)</h2>
-        <p className="muted">Objective: more students connected. Counts everyone, including demo students and team accounts.</p>
+        <h2>OKRs</h2>
+        <p className="muted">Live numbers. Counts everyone, including demo students and team accounts.</p>
         {stats.error && <p className="error">{stats.error}</p>}
         {!stats.data && !stats.error && <p className="muted">Loading…</p>}
-        {stats.data && <CommunityStats stats={stats.data} />}
+        {stats.data && <OkrStats stats={stats.data} />}
       </section>
 
       <section>

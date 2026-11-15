@@ -377,8 +377,10 @@ details.more .menu button.danger { color: var(--error); }
 .radio-card input { margin-top: 4px; }
 .confirm-box { background: #fff7f6; border: 1px solid #f0c6c1; border-radius: 12px; padding: 12px; margin-top: 8px; }
 .resolved { opacity: 0.6; }
-/* Admin: OKR 1 numbers, one tile each. */
+/* Admin: OKRs, one tile per key result, grouped by objective. */
 .okr { margin-bottom: 32px; }
+.okr-objective { margin-top: 20px; }
+.okr-objective h3 { font-size: 1rem; }
 .okr-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 12px; margin: 12px 0 0; }
 .okr-tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
 .okr-tile dt { font-size: 0.85rem; font-weight: 600; color: var(--muted); }

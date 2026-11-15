@@ -1235,32 +1235,42 @@ begin
 end $$;
 
 -- ===========================================================================
--- Admin: OKR 1, "more students connected"
+-- Admin: OKRs
 
--- Totals for the Reports screen. Everyone counts, demo students and team
--- accounts included. A meeting is a meetup both people agreed to
--- (confirmed or completed); a connection is an accepted friendship.
+-- Numbers for the Reports screen. Everyone counts, demo students and team
+-- accounts included.
+--   Objective 1, more students connected:
+--     KR1 students with at least one friend (an accepted friendship)
+--     KR2 meetings set up (meetups both people agreed to: confirmed or completed)
+--   Objective 2, students' knowledge increased:
+--     KR1 study guides shared
+--     KR2 average confidence gain after a study session (1-5 survey, after minus before)
 create or replace function admin_okr_stats(p_token uuid) returns json
 language plpgsql stable security definer set search_path = public as $$
 begin
   perform _require_admin(p_token);
   return (
-    with met as (
-      select requester_id as student_id from meetups where status in ('confirmed', 'completed')
-      union
-      select partner_id from meetups where status in ('confirmed', 'completed')
-    ), befriended as (
+    with befriended as (
       select requester_id as student_id from friendships where status = 'accepted'
       union
       select addressee_id from friendships where status = 'accepted'
+    ), met as (
+      select requester_id as student_id from meetups where status in ('confirmed', 'completed')
+      union
+      select partner_id from meetups where status in ('confirmed', 'completed')
     )
     select json_build_object(
       'students', (select count(*) from students),
-      'students_with_meeting', (select count(*) from met),
-      'connections', (select count(*) from friendships where status = 'accepted'),
       'students_with_friend', (select count(*) from befriended),
-      'calendar_links', (select count(*) from calendar_feeds),
-      'calendar_synced', (select count(*) from calendar_feeds where last_fetched_at is not null)
+      'connections', (select count(*) from friendships where status = 'accepted'),
+      'meetings', (select count(*) from meetups where status in ('confirmed', 'completed')),
+      'students_with_meeting', (select count(*) from met),
+      'resources_shared', (select count(*) from study_resources),
+      'resource_sharers', (select count(distinct uploader_id) from study_resources),
+      'surveys', (select count(*) from meetup_surveys),
+      'confidence_before', (select round(avg(confidence_before), 1) from meetup_surveys),
+      'confidence_after', (select round(avg(confidence_after), 1) from meetup_surveys),
+      'confidence_gain', (select round(avg(confidence_after - confidence_before), 1) from meetup_surveys)
     )
   );
 end $$;
