@@ -47,7 +47,40 @@ function OkrStats({ stats: s }) {
   ))
 }
 
-// Admins only: OKR numbers, then reports of students and study guides.
+// Do students come back? Real students only, from admin_okr_stats.
+function RetentionStats({ stats: s }) {
+  const rate = (n, of) => (of ? `${Math.round((100 * n) / of)}%` : '–')
+  const tiles = [
+    ['Active in the last 7 days', rate(s.active_7d, s.real_students), `${s.active_7d} of ${s.real_students} students`],
+    [
+      'Week-1 retention',
+      rate(s.week1_retained, s.week1_eligible),
+      s.week1_eligible
+        ? `${s.week1_retained} of ${s.week1_eligible} students who joined 2+ weeks ago came back in their second week`
+        : 'No one has been here 2 weeks yet',
+    ],
+    [
+      'Returning students',
+      rate(s.returning, s.returning_eligible),
+      s.returning_eligible
+        ? `${s.returning} of ${s.returning_eligible} students came back a week or more after joining`
+        : 'No one has been here a week yet',
+    ],
+  ]
+  return (
+    <dl className="okr-tiles">
+      {tiles.map(([label, value, detail]) => (
+        <div key={label} className="okr-tile">
+          <dt>{label}</dt>
+          <dd className="okr-value">{value}</dd>
+          <dd className="okr-detail">{detail}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// Admins only: OKR and retention numbers, then reports of students and study guides.
 // Make someone an admin with `npm run make-admin -- <username>`.
 export default function Reports({ me }) {
   const stats = useRpc('admin_okr_stats', {}, [me.id])
@@ -79,6 +112,17 @@ export default function Reports({ me }) {
         {!stats.data && !stats.error && <p className="muted">Loading…</p>}
         {stats.data && <OkrStats stats={stats.data} />}
       </section>
+
+      {stats.data && (
+        <section className="okr">
+          <h2>Retention</h2>
+          <p className="muted">
+            Do students come back? Real students only (demo students can't). Active means they messaged, posted, sent a request, shared or liked a
+            guide, or filled in a survey{stats.data.visits_since ? `, or opened the app (counted since ${new Date(`${stats.data.visits_since}T12:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})` : ''}.
+          </p>
+          <RetentionStats stats={stats.data} />
+        </section>
+      )}
 
       <section>
         <h2>Reports to review</h2>

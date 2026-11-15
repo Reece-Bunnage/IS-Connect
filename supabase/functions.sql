@@ -346,6 +346,10 @@ declare
   v_me uuid := _session_student(p_token);
 begin
   update students set last_active_at = now() where id = v_me;
+  -- One row per day the app is open, for retention (admin_okr_stats).
+  if v_me is not null then
+    insert into student_visits (student_id) values (v_me) on conflict do nothing;
+  end if;
   return json_build_object(
     'unread_messages', (select count(*) from messages m
                         where m.recipient_id = v_me and m.read_at is null and not _is_blocked(v_me, m.sender_id)
@@ -1245,6 +1249,10 @@ end $$;
 --   Objective 2, students' knowledge increased:
 --     KR1 study guides shared
 --     KR2 average confidence gain after a study session (1-5 survey, after minus before)
+-- Plus retention, for real students only (demo students can't come back).
+-- "Active" means they did something (messaged, posted in a group, sent a
+-- request, shared or liked a guide, filled in a survey) or had the app open
+-- (student_visits, recorded by my_state from 2026-11-15).
 create or replace function admin_okr_stats(p_token uuid) returns json
 language plpgsql stable security definer set search_path = public as $$
 begin
@@ -1258,8 +1266,34 @@ begin
       select requester_id as student_id from meetups where status in ('confirmed', 'completed')
       union
       select partner_id from meetups where status in ('confirmed', 'completed')
+    ), real_students as (
+      select s.id, u.created_at as joined_at from students s join app_users u on u.id = s.user_id
+    ), actions as (
+      select sender_id as student_id, sent_at as at from messages
+      union all select sender_id, sent_at from group_messages
+      union all select sender_id, created_at from message_requests
+      union all select requester_id, created_at from friendships
+      union all select requester_id, created_at from meetups
+      union all select uploader_id, uploaded_at from study_resources
+      union all select student_id, created_at from resource_likes
+      union all select student_id, created_at from meetup_surveys
+      union all select student_id, day::timestamptz from student_visits
+    ), activity as (
+      select a.student_id, a.at from actions a join real_students r on r.id = a.student_id
     )
     select json_build_object(
+      'real_students', (select count(*) from real_students),
+      'active_7d', (select count(distinct student_id) from activity where at > now() - interval '7 days'),
+      -- Week-1 retention: joined 2+ weeks ago, active again 7-14 days after joining.
+      'week1_eligible', (select count(*) from real_students where joined_at <= now() - interval '14 days'),
+      'week1_retained', (select count(*) from real_students r where r.joined_at <= now() - interval '14 days'
+                           and exists (select 1 from activity a where a.student_id = r.id
+                                       and a.at >= r.joined_at + interval '7 days' and a.at < r.joined_at + interval '14 days')),
+      -- Returning: joined 1+ week ago, active again at any point a week or more after joining.
+      'returning_eligible', (select count(*) from real_students where joined_at <= now() - interval '7 days'),
+      'returning', (select count(*) from real_students r where r.joined_at <= now() - interval '7 days'
+                      and exists (select 1 from activity a where a.student_id = r.id and a.at >= r.joined_at + interval '7 days')),
+      'visits_since', (select min(day) from student_visits),
       'students', (select count(*) from students),
       'students_with_friend', (select count(*) from befriended),
       'connections', (select count(*) from friendships where status = 'accepted'),

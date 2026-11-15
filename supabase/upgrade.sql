@@ -153,6 +153,13 @@ create table if not exists meetup_surveys (
   primary key (meetup_id, student_id)
 );
 
+-- One row per student per day they had the app open (for retention numbers).
+create table if not exists student_visits (
+  student_id uuid not null references students(id) on delete cascade,
+  day        date not null default current_date,
+  primary key (student_id, day)
+);
+
 -- Row Level Security: lock the private tables, open the new public ones.
 alter table courses          enable row level security;
 alter table student_courses  enable row level security;
@@ -168,6 +175,7 @@ alter table group_messages   enable row level security;
 alter table study_queue      enable row level security;
 alter table calendar_feeds   enable row level security;
 alter table meetup_surveys   enable row level security;
+alter table student_visits   enable row level security;
 
 drop policy if exists "Public read" on friendships;
 drop policy if exists "Public read" on messages;

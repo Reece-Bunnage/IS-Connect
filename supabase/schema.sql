@@ -4,6 +4,8 @@
 -- An existing database from before October 2026 is upgraded with upgrade.sql instead.
 
 drop table if exists items cascade;              -- old connection-test table
+drop table if exists student_visits cascade;
+drop table if exists resource_likes cascade;
 drop table if exists reports cascade;
 drop table if exists saved_resources cascade;
 drop table if exists study_queue cascade;
@@ -283,6 +285,14 @@ create table study_queue (
   check ((course_id is null) <> (skill_id is null))
 );
 
+-- One row per student per day they had the app open (my_state records it),
+-- for the retention numbers on the admin Reports screen.
+create table student_visits (
+  student_id uuid not null references students(id) on delete cascade,
+  day        date not null default current_date,
+  primary key (student_id, day)
+);
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- Profiles, classes, skills, free times and study guides are public to read.
@@ -313,6 +323,7 @@ alter table study_groups       enable row level security;
 alter table group_members      enable row level security;
 alter table group_messages     enable row level security;
 alter table study_queue        enable row level security;
+alter table student_visits     enable row level security;
 
 create policy "Public read" on students           for select to anon, authenticated using (true);
 create policy "Public read" on skills             for select to anon, authenticated using (true);
