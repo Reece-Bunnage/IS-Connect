@@ -74,8 +74,8 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
   const otherProfile = students.data.find((s) => s.id === selectedId)
   const c = chat.data
 
-  async function send(text) {
-    const body = (text ?? draft).trim()
+  async function send() {
+    const body = draft.trim()
     if (!body) return
     setSending(true)
     setSendError(null)
@@ -101,7 +101,8 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
     }
   }
 
-  // AI text goes into the message box to read and edit; it's never sent for them.
+  // A suggestion (template or AI) goes into the message box to read and
+  // edit; it's never sent for them.
   function pickOpener(text) {
     setDraft(text)
     inputRef.current?.focus()
@@ -252,9 +253,9 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
                       </>
                     ) : (
                       <>
-                        <p className="muted">Not sure what to say? Tap one to send it:</p>
+                        <p className="muted">Not sure what to say? Tap one to edit it, then send:</p>
                         {icebreakers(me, otherProfile).map((t) => (
-                          <button key={t} className="chip" disabled={!c.can_send || sending} onClick={() => send(t)}>
+                          <button key={t} className="chip" disabled={!c.can_send} onClick={() => pickOpener(t)}>
                             {t}
                           </button>
                         ))}
