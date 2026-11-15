@@ -1233,3 +1233,34 @@ begin
   perform _require_admin(p_token);
   delete from study_resources where id = p_resource_id;
 end $$;
+
+-- ===========================================================================
+-- Admin: OKR 1, "more students connected"
+
+-- Totals for the Reports screen. Everyone counts, demo students and team
+-- accounts included. A meeting is a meetup both people agreed to
+-- (confirmed or completed); a connection is an accepted friendship.
+create or replace function admin_okr_stats(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform _require_admin(p_token);
+  return (
+    with met as (
+      select requester_id as student_id from meetups where status in ('confirmed', 'completed')
+      union
+      select partner_id from meetups where status in ('confirmed', 'completed')
+    ), befriended as (
+      select requester_id as student_id from friendships where status = 'accepted'
+      union
+      select addressee_id from friendships where status = 'accepted'
+    )
+    select json_build_object(
+      'students', (select count(*) from students),
+      'students_with_meeting', (select count(*) from met),
+      'connections', (select count(*) from friendships where status = 'accepted'),
+      'students_with_friend', (select count(*) from befriended),
+      'calendar_links', (select count(*) from calendar_feeds),
+      'calendar_synced', (select count(*) from calendar_feeds where last_fetched_at is not null)
+    )
+  );
+end $$;
