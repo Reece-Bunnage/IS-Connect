@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { rpc } from '../api.js'
 import { formatWeek } from '../time.js'
 import { Avatar, CompletenessMeter, programLabel } from '../ui.jsx'
+import ChangePassword from './ChangePassword.jsx'
 
 const CONTACT_LABEL = { anyone: 'Anyone', courses: 'Classmates and friends', friends: 'Friends only' }
 
 // Your saved profile, read back from the database on every page load.
 export default function MyProfile({ go, profile, session, onDeleted }) {
-  const [code, setCode] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -27,15 +27,6 @@ export default function MyProfile({ go, profile, session, onDeleted }) {
   const courses = profile.student_courses.map((c) => c.courses.code).sort()
   const skills = profile.student_skills.map((s) => s.skills.name)
   const needs = profile.student_needs.map((s) => s.skills.name)
-
-  async function newCode() {
-    setError(null)
-    try {
-      setCode(await rpc('new_recovery_code'))
-    } catch (err) {
-      setError(err.message)
-    }
-  }
 
   async function deleteAccount(e) {
     e.preventDefault()
@@ -124,18 +115,8 @@ export default function MyProfile({ go, profile, session, onDeleted }) {
       <section className="card">
         <h2>Account</h2>
         {error && <p className="error">{error}</p>}
-        <h3 className="spaced">Recovery code</h3>
-        <p className="muted">Lost your recovery code? Make a new one. The old one stops working.</p>
-        {code ? (
-          <>
-            <p className="recovery-code">{code}</p>
-            <p className="notice">Save this somewhere safe. It won't be shown again.</p>
-          </>
-        ) : (
-          <button className="secondary" onClick={newCode}>
-            Make a new recovery code
-          </button>
-        )}
+        <h3 className="spaced">Change password</h3>
+        <ChangePassword />
 
         <h3 className="spaced">Delete account</h3>
         {!deleting ? (

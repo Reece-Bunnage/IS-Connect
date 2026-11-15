@@ -4,6 +4,7 @@ title: IS-Connect ERD
 erDiagram
     app_users ||--o| students : "1-to-0..1: owns profile"
     app_users ||--o{ app_sessions : "1-to-many: logged-in browsers"
+    app_users ||--o{ password_reset_requests : "1-to-many: asks an admin for a reset"
     students ||--o{ student_skills : "M:N with skills: strong in"
     skills ||--o{ student_skills : "M:N with students"
     students ||--o{ student_needs : "M:N with skills: needs help with"
@@ -32,6 +33,7 @@ erDiagram
     study_groups ||--o{ group_messages : "1-to-many: contains"
     students ||--o{ group_messages : "1-to-many: posts"
     students ||--o{ study_queue : "1-to-many: waits for a match"
+    students ||--o{ student_visits : "1-to-many: opened the app on (retention)"
     courses ||--o{ study_queue : "1-to-many: match on class"
     skills ||--o{ study_queue : "1-to-many: match on topic"
     study_groups ||--o{ study_queue : "1-to-many: matched into"
@@ -40,7 +42,8 @@ erDiagram
         uuid id PK
         text username UK
         text password_hash "bcrypt"
-        text recovery_hash "bcrypt, one-time code"
+        boolean must_change_password "after an admin's temporary password"
+        timestamptz temp_password_expires_at "48 hours"
         boolean is_admin
         timestamptz created_at
     }
@@ -48,6 +51,20 @@ erDiagram
         uuid token PK
         uuid user_id FK
         timestamptz created_at
+    }
+    password_reset_requests {
+        bigint id PK
+        uuid user_id FK
+        text contact "how an admin can reach them"
+        text note
+        timestamptz created_at
+        timestamptz handled_at
+        uuid handled_by FK "the admin"
+        text outcome "temporary_password or dismissed"
+    }
+    student_visits {
+        uuid student_id PK, FK
+        date day PK
     }
     students {
         uuid id PK

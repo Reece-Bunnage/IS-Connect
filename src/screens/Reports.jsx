@@ -80,7 +80,96 @@ function RetentionStats({ stats: s }) {
   )
 }
 
-// Admins only: OKR and retention numbers, then reports of students and study guides.
+// "Forgot password?" requests. The admin contacts the student, checks it's
+// really them, then sets a temporary password (shown here once) to pass on.
+function PasswordResets({ me }) {
+  const requests = useRpc('admin_password_resets', {}, [me.id])
+  const [confirming, setConfirming] = useState(null) // request id
+  const [issued, setIssued] = useState([]) // [{ id, username, temp }] shown until the page is left
+  const [copied, setCopied] = useState(null)
+  const [error, setError] = useState(null)
+
+  async function run(fn, r) {
+    setError(null)
+    try {
+      const temp = await rpc(fn, { p_request_id: r.id })
+      if (fn === 'admin_set_temp_password') setIssued((list) => [{ id: r.id, username: r.username, temp }, ...list])
+      setConfirming(null)
+      await requests.reload()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function copy(item) {
+    try {
+      await navigator.clipboard.writeText(item.temp)
+      setCopied(item.id)
+    } catch {
+      // Clipboard blocked; it's on screen to copy by hand.
+    }
+  }
+
+  const open = requests.data ?? []
+  return (
+    <section className="okr">
+      <h2>Password reset requests</h2>
+      <p className="muted">Contact the student and check it's really them (for example their name and classes) before setting a temporary password.</p>
+      {requests.error && <p className="error">{requests.error}</p>}
+      {error && <p className="error">{error}</p>}
+      {issued.map((item) => (
+        <article key={item.id} className="card notice-card" role="status">
+          <h3>Temporary password for @{item.username}</h3>
+          <p className="recovery-code">{item.temp}</p>
+          <p>Give this to them directly. It works for 48 hours, and they'll choose a new password when they log in. It won't be shown again.</p>
+          <button className="secondary small" onClick={() => copy(item)}>
+            {copied === item.id ? 'Copied ✓' : 'Copy'}
+          </button>
+        </article>
+      ))}
+      {!requests.data && !requests.error && <p className="muted">Loading…</p>}
+      {requests.data && open.length === 0 && <p className="muted">No open requests.</p>}
+      <div className="list">
+        {open.map((r) => (
+          <article key={r.id} className="card">
+            <h3>
+              @{r.username}
+              {r.full_name && <span className="muted"> · {r.full_name}</span>}
+            </h3>
+            <p>
+              <strong>Reach them:</strong> {r.contact}
+            </p>
+            {r.note && <p>“{r.note}”</p>}
+            <p className="muted">Asked {new Date(r.created_at).toLocaleString()}</p>
+            {confirming === r.id ? (
+              <div className="row actions">
+                <span>Reset @{r.username}'s password? Their current password stops working.</span>
+                <button className="primary small" onClick={() => run('admin_set_temp_password', r)}>
+                  Yes, set temporary password
+                </button>
+                <button className="secondary small" onClick={() => setConfirming(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="row actions">
+                <button className="primary small" onClick={() => setConfirming(r.id)}>
+                  Set temporary password
+                </button>
+                <button className="secondary small" onClick={() => run('admin_dismiss_password_reset', r)}>
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// Admins only: password reset requests, OKR and retention numbers, then
+// reports of students and study guides.
 // Make someone an admin with `npm run make-admin -- <username>`.
 export default function Reports({ me }) {
   const stats = useRpc('admin_okr_stats', {}, [me.id])
@@ -103,7 +192,9 @@ export default function Reports({ me }) {
 
   return (
     <>
-      <PageHeader title="Reports" text="Progress on our OKRs, and reports of students and study guides to review." />
+      <PageHeader title="Reports" text="Password reset requests, progress on our OKRs, and reports of students and study guides to review." />
+
+      <PasswordResets me={me} />
 
       <section className="okr">
         <h2>OKRs</h2>

@@ -134,8 +134,13 @@ begin
       and g.course_id not in (select course_id from student_courses where student_id = p_student);
 end $$;
 
--- A fresh recovery code like 'K7Q2-M9XD-P4TA'.
-create or replace function _new_recovery_code() returns text
+-- Recovery codes were replaced by admin-assisted password resets (Nov 2026).
+drop function if exists reset_password(text, text, text);
+drop function if exists new_recovery_code(uuid);
+drop function if exists _new_recovery_code();
+
+-- A temporary password like 'K7Q2-M9XD-P4TA' (no look-alike letters).
+create or replace function _new_temp_password() returns text
 language plpgsql volatile set search_path = public, extensions as $$
 declare
   v_chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -160,7 +165,7 @@ revoke execute on function _session_user(uuid), _session_student(uuid), _is_bloc
   _are_friends(uuid, uuid), _share_course(uuid, uuid), _first_name(uuid), _other_student(uuid, uuid),
   _in_contact(uuid, uuid), _contact_block_reason(uuid, students),
   _notify(uuid, text, text, text, jsonb), _course_group(bigint), _sync_course_groups(uuid),
-  _new_recovery_code(), _require_admin(uuid)
+  _new_temp_password(), _require_admin(uuid)
   from public, anon, authenticated;
 
 -- ===========================================================================
@@ -170,7 +175,6 @@ create or replace function sign_up(p_username text, p_password text) returns jso
 language plpgsql security definer set search_path = public, extensions as $$
 declare
   v_username text := lower(trim(p_username));
-  v_code     text := _new_recovery_code();
   v_user_id  uuid;
   v_token    uuid;
 begin
@@ -183,12 +187,12 @@ begin
   if exists (select 1 from app_users where username = v_username) then
     raise exception 'That username is taken.';
   end if;
-  insert into app_users (username, password_hash, recovery_hash)
-    values (v_username, crypt(p_password, gen_salt('bf')), crypt(v_code, gen_salt('bf')))
+  insert into app_users (username, password_hash)
+    values (v_username, crypt(p_password, gen_salt('bf')))
     returning id into v_user_id;
   insert into app_sessions (user_id) values (v_user_id) returning token into v_token;
   return json_build_object('token', v_token, 'user_id', v_user_id, 'username', v_username,
-                           'is_admin', false, 'recovery_code', v_code);
+                           'is_admin', false, 'must_change_password', false);
 end $$;
 
 create or replace function log_in(p_username text, p_password text) returns json
@@ -201,15 +205,20 @@ begin
   if v_user.id is null or v_user.password_hash <> crypt(p_password, v_user.password_hash) then
     raise exception 'Wrong username or password.';
   end if;
+  if v_user.must_change_password and v_user.temp_password_expires_at < now() then
+    raise exception 'That temporary password has expired. Ask for a new one with "Forgot password?".';
+  end if;
   insert into app_sessions (user_id) values (v_user.id) returning token into v_token;
   return json_build_object('token', v_token, 'user_id', v_user.id, 'username', v_user.username,
-                           'is_admin', v_user.is_admin);
+                           'is_admin', v_user.is_admin, 'must_change_password', v_user.must_change_password);
 end $$;
 
 -- Who is logged in with this token? (null if the token is unknown)
+-- must_change_password: they logged in with an admin's temporary password.
 create or replace function get_session(p_token uuid) returns json
 language sql stable security definer set search_path = public as $$
-  select json_build_object('token', s.token, 'user_id', u.id, 'username', u.username, 'is_admin', u.is_admin)
+  select json_build_object('token', s.token, 'user_id', u.id, 'username', u.username, 'is_admin', u.is_admin,
+                           'must_change_password', u.must_change_password)
   from app_sessions s join app_users u on u.id = s.user_id
   where s.token = p_token
 $$;
@@ -219,46 +228,73 @@ language sql security definer set search_path = public as $$
   delete from app_sessions where token = p_token
 $$;
 
--- "Forgot password?": the recovery code sets a new password, logs out every
--- other browser, and is replaced by a new code (it works once).
-create or replace function reset_password(p_username text, p_recovery_code text, p_new_password text) returns json
-language plpgsql security definer set search_path = public, extensions as $$
+-- "Forgot password?": ask an admin for help. The app has no emails, so the
+-- student says how to reach them; admins see the request on the Reports
+-- screen (and get a notification), check it's really them, then set a
+-- temporary password. The reply is the same whether or not the username
+-- exists, so this can't be used to find usernames. One open request per
+-- login: asking again updates it.
+create or replace function request_password_reset(p_username text, p_contact text, p_note text default null)
+returns void
+language plpgsql security definer set search_path = public as $$
 declare
-  v_user  app_users;
-  v_code  text := _new_recovery_code();
-  v_clean text := upper(regexp_replace(coalesce(p_recovery_code, ''), '[^A-Za-z0-9]', '', 'g'));
-  v_typed text := substr(v_clean, 1, 4) || '-' || substr(v_clean, 5, 4) || '-' || substr(v_clean, 9, 4);
-  v_token uuid;
+  v_username text := lower(btrim(coalesce(p_username, '')));
+  v_contact  text := nullif(btrim(coalesce(p_contact, '')), '');
+  v_note     text := nullif(btrim(coalesce(p_note, '')), '');
+  v_user_id  uuid;
+  v_request  bigint;
 begin
-  select * into v_user from app_users where username = lower(trim(p_username));
-  if v_user.id is null or v_user.recovery_hash is null
-     or v_user.recovery_hash <> crypt(v_typed, v_user.recovery_hash) then
-    raise exception 'That username and recovery code don''t match.';
+  if v_contact is null or length(v_contact) < 3 then
+    raise exception 'Please say how an admin can reach you, like your school email.';
   end if;
-  if length(coalesce(p_new_password, '')) < 6 then
-    raise exception 'Password must be at least 6 characters.';
+  if length(v_contact) > 200 then
+    raise exception 'Keep how to reach you under 200 characters.';
   end if;
-  update app_users set password_hash = crypt(p_new_password, gen_salt('bf')),
-                       recovery_hash = crypt(v_code, gen_salt('bf'))
-    where id = v_user.id;
-  delete from app_sessions where user_id = v_user.id;
-  insert into app_sessions (user_id) values (v_user.id) returning token into v_token;
-  return json_build_object('token', v_token, 'user_id', v_user.id, 'username', v_user.username,
-                           'is_admin', v_user.is_admin, 'recovery_code', v_code);
+  if length(v_note) > 500 then
+    raise exception 'Keep the note under 500 characters.';
+  end if;
+  select id into v_user_id from app_users where username = v_username;
+  if v_user_id is null then
+    return;
+  end if;
+  update password_reset_requests set contact = v_contact, note = v_note, created_at = now()
+    where user_id = v_user_id and handled_at is null
+    returning id into v_request;
+  if v_request is null then
+    insert into password_reset_requests (user_id, contact, note) values (v_user_id, v_contact, v_note);
+    perform _notify(s.id, 'password_reset', '@' || v_username || ' asked for a password reset.', 'reports', '{}')
+      from app_users a join students s on s.user_id = a.id
+      where a.is_admin;
+  end if;
 end $$;
 
--- Replace your recovery code (the old one stops working).
-create or replace function new_recovery_code(p_token uuid) returns text
+-- Change your password. Needs the current one, except right after logging in
+-- with an admin's temporary password (that login proves it's you). Logs out
+-- your other browsers.
+create or replace function change_password(p_token uuid, p_current text, p_new text) returns json
 language plpgsql security definer set search_path = public, extensions as $$
 declare
-  v_user_id uuid := _session_user(p_token);
-  v_code    text := _new_recovery_code();
+  v_user app_users;
 begin
-  if v_user_id is null then
+  select * into v_user from app_users where id = _session_user(p_token);
+  if v_user.id is null then
     raise exception 'Your login has expired. Please log in again.';
   end if;
-  update app_users set recovery_hash = crypt(v_code, gen_salt('bf')) where id = v_user_id;
-  return v_code;
+  if not v_user.must_change_password
+     and v_user.password_hash <> crypt(coalesce(p_current, ''), v_user.password_hash) then
+    raise exception 'Your current password is wrong.';
+  end if;
+  if length(coalesce(p_new, '')) < 6 then
+    raise exception 'Password must be at least 6 characters.';
+  end if;
+  if v_user.password_hash = crypt(p_new, v_user.password_hash) then
+    raise exception 'Choose a password that''s different from the old one.';
+  end if;
+  update app_users set password_hash = crypt(p_new, gen_salt('bf')),
+                       must_change_password = false, temp_password_expires_at = null
+    where id = v_user.id;
+  delete from app_sessions where user_id = v_user.id and token <> p_token;
+  return get_session(p_token);
 end $$;
 
 -- Delete your login, profile, messages and everything else you made.
@@ -1236,6 +1272,58 @@ language plpgsql security definer set search_path = public as $$
 begin
   perform _require_admin(p_token);
   delete from study_resources where id = p_resource_id;
+end $$;
+
+-- ===========================================================================
+-- Admin: password reset requests ("Forgot password?")
+
+-- Open requests, oldest first.
+create or replace function admin_password_resets(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform _require_admin(p_token);
+  return coalesce((select json_agg(json_build_object(
+            'id', r.id, 'username', u.username, 'full_name', s.full_name,
+            'contact', r.contact, 'note', r.note, 'created_at', r.created_at)
+          order by r.created_at)
+          from password_reset_requests r
+          join app_users u on u.id = r.user_id
+          left join students s on s.user_id = u.id
+          where r.handled_at is null), '[]'::json);
+end $$;
+
+-- After checking it's really them: give the student a temporary password.
+-- Returns it once (only its hash is kept). It works for 48 hours, they must
+-- choose a new password when they log in with it, and they're logged out
+-- everywhere now.
+create or replace function admin_set_temp_password(p_token uuid, p_request_id bigint) returns text
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_admin   uuid := _session_user(p_token);
+  v_user_id uuid;
+  v_temp    text := _new_temp_password();
+begin
+  perform _require_admin(p_token);
+  select user_id into v_user_id from password_reset_requests where id = p_request_id and handled_at is null;
+  if v_user_id is null then
+    raise exception 'That request was already handled.';
+  end if;
+  update app_users set password_hash = crypt(v_temp, gen_salt('bf')), must_change_password = true,
+                       temp_password_expires_at = now() + interval '48 hours'
+    where id = v_user_id;
+  delete from app_sessions where user_id = v_user_id;
+  update password_reset_requests set handled_at = now(), handled_by = v_admin, outcome = 'temporary_password'
+    where id = p_request_id;
+  return v_temp;
+end $$;
+
+-- Close a request without changing the password (spam, or sorted out another way).
+create or replace function admin_dismiss_password_reset(p_token uuid, p_request_id bigint) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform _require_admin(p_token);
+  update password_reset_requests set handled_at = now(), handled_by = _session_user(p_token), outcome = 'dismissed'
+    where id = p_request_id and handled_at is null;
 end $$;
 
 -- ===========================================================================

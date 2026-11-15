@@ -11,6 +11,7 @@
     "db:functions": "node --env-file-if-exists=.env.local scripts/db-setup.js --functions-only",
     "db:upgrade": "node --env-file-if-exists=.env.local scripts/db-setup.js --upgrade",
     "make-admin": "node --env-file-if-exists=.env.local scripts/make-admin.js",
+    "reset-password": "node --env-file-if-exists=.env.local scripts/reset-password.js",
     "deploy:calendar": "node --env-file-if-exists=.env.local scripts/deploy-calendar.js",
     "deploy:ai": "node --env-file-if-exists=.env.local scripts/deploy-ai.js"
   },

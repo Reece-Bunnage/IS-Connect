@@ -29,28 +29,30 @@ async function call(fn, args) {
   return data
 }
 
-// The session includes `recovery_code`, shown once so the student can save it.
 export async function signUp(username, password) {
   const session = await call('sign_up', { p_username: username, p_password: password })
   saveToken(session.token)
   return session
 }
 
+// session.must_change_password: they used an admin's temporary password and
+// have to choose a new one before using the app.
 export async function logIn(username, password) {
   const session = await call('log_in', { p_username: username, p_password: password })
   saveToken(session.token)
   return session
 }
 
-// "Forgot password?": returns a new session and a new recovery code.
-export async function resetPassword(username, recoveryCode, newPassword) {
-  const session = await call('reset_password', {
-    p_username: username,
-    p_recovery_code: recoveryCode,
-    p_new_password: newPassword,
-  })
-  saveToken(session.token)
-  return session
+// "Forgot password?": asks an admin for help. Succeeds the same way whether
+// or not the username exists.
+export async function requestPasswordReset(username, contact, note) {
+  await call('request_password_reset', { p_username: username, p_contact: contact, p_note: note || null })
+}
+
+// New password. `current` can be empty right after logging in with a
+// temporary password. Returns the updated session; other browsers are logged out.
+export async function changePassword(current, next) {
+  return call('change_password', { p_token: getToken(), p_current: current || null, p_new: next })
 }
 
 // The saved login, checked against the database (null if none or expired).

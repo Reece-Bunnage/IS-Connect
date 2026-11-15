@@ -10,7 +10,8 @@ Table app_users {
   id uuid [pk]
   username text [unique, not null]
   password_hash text [not null, note: 'bcrypt']
-  recovery_hash text [note: 'bcrypt hash of the one-time recovery code']
+  must_change_password boolean [not null, default: false, note: 'after an admin sets a temporary password']
+  temp_password_expires_at timestamptz [note: 'the temporary password works for 48 hours']
   is_admin boolean [not null, default: false]
   created_at timestamptz
 }
@@ -19,6 +20,17 @@ Table app_sessions {
   token uuid [pk]
   user_id uuid [not null, ref: > app_users.id]
   created_at timestamptz
+}
+
+Table password_reset_requests {
+  id bigint [pk]
+  user_id uuid [not null, ref: > app_users.id]
+  contact text [not null, note: 'how an admin can reach them']
+  note text
+  created_at timestamptz
+  handled_at timestamptz
+  handled_by uuid [ref: > app_users.id, note: 'the admin']
+  outcome text [note: 'temporary_password or dismissed']
 }
 
 Table students {
@@ -203,4 +215,12 @@ Table study_queue {
   skill_id bigint [ref: > skills.id, note: '...or a topic']
   matched_group_id bigint [ref: > study_groups.id]
   created_at timestamptz
+}
+
+Table student_visits {
+  student_id uuid [ref: > students.id, note: 'one row per day they opened the app (retention)']
+  day date
+  indexes {
+    (student_id, day) [pk]
+  }
 }
