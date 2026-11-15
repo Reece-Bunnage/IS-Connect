@@ -10,6 +10,23 @@ export async function rpc(fn, args = {}) {
   return data
 }
 
+// Three AI-written first messages for an empty chat with this student, from
+// the Edge Function in supabase/functions/ai-openers (Gemini). Throws an
+// Error with a short message to show when suggestions aren't available.
+export async function suggestOpeners(otherId) {
+  const { data, error } = await supabase.functions.invoke('ai-openers', { body: { token: getToken(), otherId } })
+  if (error) {
+    let message = "Couldn't write suggestions right now."
+    try {
+      message = (await error.context.json()).error || message
+    } catch {
+      // Not a JSON reply (e.g. offline); keep the general message.
+    }
+    throw new Error(message)
+  }
+  return data.openers
+}
+
 // Run a read and keep its result. reload() re-runs it without blanking the
 // current data, so lists don't flicker after an action. `run` returns a
 // Supabase response ({ data, error }) or a promise of the data itself.

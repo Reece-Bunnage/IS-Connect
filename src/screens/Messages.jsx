@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient.js'
-import { rpc, useHiddenIds, usePolling, useQuery, useRpc } from '../api.js'
+import { rpc, suggestOpeners, useHiddenIds, usePolling, useQuery, useRpc } from '../api.js'
 import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader, ProfileDetails, activeLabel, arrowKeys, hasProfileDetails, programLabel, tabProps } from '../ui.jsx'
 
 // Conversation suggestions so a nervous first message isn't a blank box.
@@ -26,6 +26,10 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
   const [sendError, setSendError] = useState(null)
   const bottomRef = useRef(null)
   const profileRef = useRef(null)
+  const inputRef = useRef(null)
+  // AI-written openers for an empty chat: { loading, openers, error }.
+  const [ai, setAi] = useState({})
+  const aiFor = useRef(null) // the chat they're for, so a late reply can't land in another chat
 
   const inbox = useRpc('my_inbox', {}, [me.id])
   const chat = useQuery(() => (selectedId ? rpc('my_chat', { p_other_id: selectedId }) : Promise.resolve(null)), [selectedId])
@@ -53,6 +57,12 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
     bottomRef.current?.scrollIntoView({ block: 'nearest' })
   }, [chatLength, selectedId])
 
+  // Each chat starts without AI suggestions.
+  useEffect(() => {
+    aiFor.current = null
+    setAi({})
+  }, [selectedId])
+
   if (inbox.error) return <p className="error">Could not load messages: {inbox.error}</p>
   if (!inbox.data || !students.data) return <p className="muted">Loading messages…</p>
 
@@ -77,6 +87,24 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
       setSendError(err.message)
     }
     setSending(false)
+  }
+
+  async function writeWithAi() {
+    const id = selectedId
+    aiFor.current = id
+    setAi((a) => ({ ...a, loading: true, error: null }))
+    try {
+      const openers = await suggestOpeners(id)
+      if (aiFor.current === id) setAi({ openers })
+    } catch (err) {
+      if (aiFor.current === id) setAi((a) => ({ ...a, loading: false, error: err.message }))
+    }
+  }
+
+  // AI text goes into the message box to read and edit; it's never sent for them.
+  function pickOpener(text) {
+    setDraft(text)
+    inputRef.current?.focus()
   }
 
   async function respond(accept) {
@@ -213,12 +241,33 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
               <div className="bubbles">
                 {c.messages.length === 0 && c.state !== 'blocked' && (
                   <div className="icebreakers">
-                    <p className="muted">Not sure what to say? Tap one to send it:</p>
-                    {icebreakers(me, otherProfile).map((t) => (
-                      <button key={t} className="chip" disabled={!c.can_send || sending} onClick={() => send(t)}>
-                        {t}
+                    {ai.openers ? (
+                      <>
+                        <p className="muted">Written by AI from what you two share. Tap one to edit it, then send:</p>
+                        {ai.openers.map((t) => (
+                          <button key={t} className="chip" disabled={!c.can_send} onClick={() => pickOpener(t)}>
+                            {t}
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <p className="muted">Not sure what to say? Tap one to send it:</p>
+                        {icebreakers(me, otherProfile).map((t) => (
+                          <button key={t} className="chip" disabled={!c.can_send || sending} onClick={() => send(t)}>
+                            {t}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {c.can_send && (
+                      <button type="button" className="link ai-write" disabled={ai.loading} onClick={writeWithAi}>
+                        {ai.openers ? 'Write 3 different ones' : 'Write 3 openers with AI →'}
                       </button>
-                    ))}
+                    )}
+                    <p className="muted small-text" role="status">
+                      {ai.loading ? 'Writing 3 suggestions…' : ai.error}
+                    </p>
                   </div>
                 )}
                 {c.messages.map((m, i) => (
@@ -242,7 +291,14 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
                     send()
                   }}
                 >
-                  <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about a class or say hello…" maxLength={2000} aria-label="Message" />
+                  <input
+                    ref={inputRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Ask about a class or say hello…"
+                    maxLength={2000}
+                    aria-label="Message"
+                  />
                   <button type="submit" className="primary" disabled={sending || !draft.trim()}>
                     Send
                   </button>

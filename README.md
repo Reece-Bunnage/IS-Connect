@@ -259,6 +259,7 @@ erDiagram
 | Backend / API | [Supabase](https://supabase.com), backend as a service. It generates a REST API from our tables, and we call it with the `@supabase/supabase-js` client. |
 | Database | PostgreSQL, hosted by Supabase, with Row Level Security policies |
 | Calendar link | A Supabase Edge Function ([supabase/functions/calendar](supabase/functions/calendar)) that turns a student's meetups into a calendar file for Google Calendar to subscribe to |
+| AI first messages | A Supabase Edge Function ([supabase/functions/ai-openers](supabase/functions/ai-openers)) that asks Google's Gemini API (free tier) for 3 first messages built from what two students share: hard topics, classes and free times. Students tap one to edit it before sending; nothing is sent for them. |
 | Secrets | The Supabase URL and publishable key live in `.env.local`, which is listed in `.gitignore` |
 
 **Why this fits our team:** Supabase's free tier gives us a real PostgreSQL database without running or hosting our own server. Every teammate can see the tables and rows in the Supabase dashboard, and we can still write the schema ourselves in SQL ([supabase/schema.sql](supabase/schema.sql)). The whole team shares one project, so our setups can't drift apart. React + Vite is a small, fast setup that works well on phones, which matters because our persona would mostly use IS-Connect on their phone.
@@ -331,6 +332,17 @@ Every push to `main` rebuilds the live site through [.github/workflows/deploy.ym
    ```
    Keep it **only** in `.env.local`, never in GitHub or a chat. When it expires, make a new one the next time you need to deploy.
 2. Run `npm run deploy:calendar`. Docker isn't needed. It prints the address calendar links are served from.
+
+**AI first messages (Edge Function).** Also on Supabase, and only needs redeploying when [supabase/functions/ai-openers](supabase/functions/ai-openers) changes. Uses the same access token as above, plus a Gemini key:
+
+1. Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) and add it to `.env.local`:
+   ```
+   GEMINI_API_KEY=<your key>
+   ```
+   No `VITE_` prefix: `VITE_` values are built into the public website, where anyone could copy the key.
+2. Run `npm run deploy:ai`. It saves the key as an Edge Function secret on Supabase and deploys the function. If your access token isn't allowed to save secrets, add `GEMINI_API_KEY` by hand under **Edge Functions → Secrets** in Supabase.
+
+The free tier has per-minute and per-day limits and is sometimes busy; the function then tries a backup model, and if that's busy too, the app says to try again in a minute. Google may use what's sent on the free tier to improve its products, so the function sends only first names and profile details every student can already see.
 
 If [supabase/functions.sql](supabase/functions.sql) or the database changed too, run `npm run db:functions` or `npm run db:upgrade` first, as above.
 

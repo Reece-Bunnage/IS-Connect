@@ -11,7 +11,8 @@
     "db:functions": "node --env-file-if-exists=.env.local scripts/db-setup.js --functions-only",
     "db:upgrade": "node --env-file-if-exists=.env.local scripts/db-setup.js --upgrade",
     "make-admin": "node --env-file-if-exists=.env.local scripts/make-admin.js",
-    "deploy:calendar": "node --env-file-if-exists=.env.local scripts/deploy-calendar.js"
+    "deploy:calendar": "node --env-file-if-exists=.env.local scripts/deploy-calendar.js",
+    "deploy:ai": "node --env-file-if-exists=.env.local scripts/deploy-ai.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
