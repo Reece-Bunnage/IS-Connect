@@ -225,7 +225,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .send-row button { margin-top: 0; }
 
 /* Meetups with this person, below the conversation (ChatMeetups in Messages.jsx). */
-.chat-meetups { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }
+.chat-meetups { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 18px; }
 .chat-meetups-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .chat-meetups-head h3 { margin: 0; font-size: 0.95rem; }
 .chat-meetups-head .link { padding: 4px 0; }
