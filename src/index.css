@@ -224,6 +224,22 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .send-row input { flex: 1; }
 .send-row button { margin-top: 0; }
 
+/* Meetups with this person, below the conversation (ChatMeetups in Messages.jsx). */
+.chat-meetups { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }
+.chat-meetups-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chat-meetups-head h3 { margin: 0; font-size: 0.95rem; }
+.chat-meetups-head .link { padding: 4px 0; }
+.chat-meetup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.chat-meetup > .icon { flex: none; color: var(--green); }
+.chat-meetup-text { flex: 1; min-width: 180px; }
+.chat-meetup-text p { margin: 0; }
+.chat-meetups .small, .chat-meetups .row { margin-top: 0; }
+.chat-free-label { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--green); font-weight: 600; font-size: 0.9rem; }
+.chat-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
+.chat-invite label { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; font-size: 0.9rem; font-weight: 600; }
+.chat-invite select { min-width: 0; }
+.chat-invite p { flex-basis: 100%; margin: 0; }
+
 /* ---- Meetups / resources / safety ---- */
 .details { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 16px 0; }
 .details dt { font-weight: 700; color: var(--muted); }
