@@ -188,10 +188,14 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .messages-layout .chat { display: none; }
 .messages-layout.has-chat .convo-list { display: none; }
 .messages-layout.has-chat .chat { display: flex; }
+/* Messages: the chat with its meetups box below, 12px apart (Groups has no box). */
+.messages-layout .chat-column { display: none; flex-direction: column; gap: 12px; min-width: 0; }
+.messages-layout.has-chat .chat-column { display: flex; }
+.chat-column .chat { flex: 1; }
 @media (min-width: 900px) {
   .messages-layout { grid-template-columns: 260px minmax(0, 1fr); align-items: stretch; }
   .messages-layout .convo-list, .messages-layout.has-chat .convo-list { display: block; }
-  .messages-layout .chat { display: flex; }
+  .messages-layout .chat, .messages-layout .chat-column { display: flex; }
   .back-to-list { display: none; }
 }
 .convo-list { margin: 0; }
@@ -225,7 +229,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .send-row button { margin-top: 0; }
 
 /* Meetups with this person, below the conversation (ChatMeetups in Messages.jsx). */
-.chat-meetups { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 18px; }
+.chat-meetups { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .chat-meetups-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .chat-meetups-head h3 { margin: 0; font-size: 0.95rem; }
 .chat-meetups-head .link { padding: 4px 0; }
