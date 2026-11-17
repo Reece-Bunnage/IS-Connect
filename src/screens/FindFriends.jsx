@@ -14,7 +14,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
   const [queuePick, setQueuePick] = useState('')
   const [joining, setJoining] = useState(false)
 
-  const students = useQuery(() => supabase.from('students').select(STUDENT_SELECT).order('created_at', { ascending: false }), [])
+  const students = useQuery(() => supabase.from('students').select(`${STUDENT_SELECT}, contact_setting`).order('created_at', { ascending: false }), [])
   const lists = useQuery(async () => {
     const [courses, skills] = await Promise.all([
       supabase.from('courses').select('id, code').order('code'),
@@ -23,6 +23,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     return { courses: courses.data ?? [], skills: skills.data ?? [] }
   }, [])
   const friendships = useRpc('my_friendships', {}, [me.id])
+  const inbox = useRpc('my_inbox', {}, [me.id])
   const queue = useRpc('my_queue', {}, [me.id])
   const { hidden } = useHiddenIds(me.id)
 
@@ -82,8 +83,22 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     setJoining(false)
   }
 
-  // The buttons people actually use sit on the card. Only rarely used or risky
-  // actions (Remove friend, Block or report) are tucked into the ⋯ menu.
+  // Can you message them yet? Mirrors _contact_block_reason in
+  // supabase/functions.sql (the server still has the final say).
+  const talking = new Set((inbox.data ?? []).filter((c) => ['chat', 'request_in', 'request_out'].includes(c.state)).map((c) => c.other_id))
+  const myCourseIds = new Set(myRow.student_courses.map((c) => c.course_id))
+  function canMessage(s) {
+    return (
+      s.friendship?.status === 'accepted' ||
+      talking.has(s.id) ||
+      s.contact_setting === 'anyone' ||
+      (s.contact_setting === 'courses' && s.student_courses.some((c) => myCourseIds.has(c.course_id)))
+    )
+  }
+
+  // Message is the main button: a meetup starts with a conversation. If their
+  // contact setting doesn't let you message them yet, Add friend leads
+  // instead. Schedule, Remove friend and Block or report sit in the ⋯ menu.
   function actions(s) {
     const f = s.friendship
     const busy = busyId === s.id
@@ -93,11 +108,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
         Message
       </button>
     )
-    const schedule = (
-      <button className="secondary small" aria-label={`Schedule a meetup with ${first}`} onClick={() => go('setupMeetup', { partnerId: s.id })}>
-        Schedule
-      </button>
-    )
+    const schedule = <button onClick={() => go('setupMeetup', { partnerId: s.id })}>Schedule a meetup</button>
     let main
     let menu
     if (f?.status === 'pending' && f.incoming) {
@@ -114,33 +125,45 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
       menu = (
         <>
           <button onClick={() => go('messages', { studentId: s.id })}>Message</button>
-          <button onClick={() => go('setupMeetup', { partnerId: s.id })}>Schedule a meetup</button>
+          {schedule}
         </>
       )
     } else if (f?.status === 'accepted') {
-      main = (
+      main = message('primary small')
+      menu = (
         <>
-          {message('primary small')}
           {schedule}
+          <button onClick={() => act(s.id, 'remove_friend', { p_other_id: s.id }, `Removed ${first} from your friends.`)}>Remove friend</button>
         </>
       )
-      menu = <button onClick={() => act(s.id, 'remove_friend', { p_other_id: s.id }, `Removed ${first} from your friends.`)}>Remove friend</button>
     } else {
+      const messageFirst = canMessage(s)
+      const friendButton =
+        f?.status === 'pending' ? (
+          <button className="secondary small" disabled>
+            Request sent
+          </button>
+        ) : (
+          <button
+            className={`${messageFirst ? 'secondary' : 'primary'} small`}
+            disabled={busy}
+            onClick={() => act(s.id, 'add_friend', { p_other_id: s.id }, `Friend request sent to ${first}.`)}
+          >
+            + Add friend
+          </button>
+        )
       main = (
         <>
-          {f?.status === 'pending' ? (
-            <button className="secondary small" disabled>
-              Request sent
-            </button>
-          ) : (
-            <button className="primary small" disabled={busy} onClick={() => act(s.id, 'add_friend', { p_other_id: s.id }, `Friend request sent to ${first}.`)}>
-              + Add friend
-            </button>
-          )}
+          {messageFirst && message('primary small')}
+          {friendButton}
+        </>
+      )
+      menu = (
+        <>
+          {!messageFirst && <button onClick={() => go('messages', { studentId: s.id })}>Message</button>}
           {schedule}
         </>
       )
-      menu = <button onClick={() => go('messages', { studentId: s.id })}>Message</button>
     }
     return (
       <div className="row actions">
@@ -155,7 +178,6 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
     )
   }
 
-  const myCourseIds = new Set(myRow.student_courses.map((c) => c.course_id))
   const myNeedIds = new Set(myRow.student_needs.map((n) => n.skill_id))
   const queueOptions = [
     ...lists.data.courses.filter((c) => myCourseIds.has(c.id)).map((c) => ({ value: `course:${c.id}`, label: `${c.code} (your class)` })),
@@ -196,7 +218,7 @@ export default function FindFriends({ go, me, params, showToast, refreshCounts }
 
   return (
     <>
-      <PageHeader eyebrow="Your IS community" title="Find someone to learn with." text="Find a friend, then schedule a meetup to grow together!" />
+      <PageHeader eyebrow="Your IS community" title="Find someone to learn with." text="Message a classmate and pick a time to study together." />
 
       <div className="segmented" role="tablist" aria-label="Show" onKeyDown={arrowKeys({ select: true })}>
         {[

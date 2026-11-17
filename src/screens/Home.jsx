@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
-import { formatSlot, formatWhen, googleCalendarLink, nextStart, toLocalInput } from '../time.js'
+import { formatSlot, formatWhen, googleCalendarLink, nextStart } from '../time.js'
 import { tipOfTheDay } from '../tips.js'
 import { Avatar, CompletenessMeter, Icon, inviteClassmate, programLabel } from '../ui.jsx'
 
@@ -61,8 +61,8 @@ export default function Home({ go, me, refreshCounts, showToast }) {
   const next = (meetups.data ?? []).find((m) => new Date(m.scheduled_at) > now && (m.status === 'confirmed' || (m.status === 'requested' && m.i_asked)))
 
   // Study partners. Friends who share a free time come first, soonest first,
-  // so you can plan a session. Without any, suggest new people: free when
-  // you are first, then best match.
+  // so you can message them about meeting then. Without any, suggest new
+  // people: free when you are first, then best match.
   const myRow = byId.get(me.id)
   const scored = students.data ? scoreStudents(students.data, me.id, hidden) : []
   const friendIds = new Set((friendships.data ?? []).filter((f) => f.status === 'accepted').map((f) => f.other_id))
@@ -268,12 +268,8 @@ export default function Home({ go, me, refreshCounts, showToast }) {
                         Free together {formatSlot(s.soonest.slot)}
                       </p>
                     </div>
-                    <button
-                      className="outline"
-                      aria-label={`Plan a study session with ${s.full_name}`}
-                      onClick={() => go('setupMeetup', { partnerId: s.id, at: toLocalInput(s.soonest.at) })}
-                    >
-                      Plan
+                    <button className="outline" aria-label={`Message ${s.full_name}`} onClick={() => go('messages', { studentId: s.id })}>
+                      Message
                     </button>
                   </div>
                 ))}

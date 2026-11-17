@@ -3,19 +3,6 @@ import { supabase } from '../supabaseClient.js'
 import { rpc, suggestOpeners, useHiddenIds, usePolling, useQuery, useRpc } from '../api.js'
 import { ActiveDot, Avatar, ChatBar, DemoBadge, Dialog, MoreMenu, PageHeader, ProfileDetails, activeLabel, arrowKeys, hasProfileDetails, programLabel, tabProps } from '../ui.jsx'
 
-// Conversation suggestions so a nervous first message isn't a blank box.
-function icebreakers(me, other) {
-  const myCourses = new Set(me.student_courses.map((c) => c.courses.code))
-  const shared = other?.student_courses?.map((c) => c.courses.code).find((c) => myCourses.has(c))
-  const theirStrength = other?.student_skills?.map((k) => k.skills.name).find((n) => me.student_needs.some((x) => x.skills.name === n))
-  return [
-    shared && `Hi! I'm in ${shared} too. Want to study together this week?`,
-    theirStrength && `Hi! I saw you're strong in ${theirStrength}. Could you help me with it sometime?`,
-    other?.ask_me_about && `Hi! Your profile says to ask you about ${other.ask_me_about}. I'd love to hear about it!`,
-    'Hi! Want to meet up and review for the next exam?',
-  ].filter(Boolean)
-}
-
 // Inbox (Chats / Requests) + one open chat (params.studentId). On a phone
 // only one shows at a time; on a wide screen they sit side by side.
 export default function Messages({ go, back, me, params, refreshCounts }) {
@@ -101,8 +88,8 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
     }
   }
 
-  // A suggestion (template or AI) goes into the message box to read and
-  // edit; it's never sent for them.
+  // An AI suggestion goes into the message box to read and edit; it's never
+  // sent for them.
   function pickOpener(text) {
     setDraft(text)
     inputRef.current?.focus()
@@ -240,32 +227,27 @@ export default function Messages({ go, back, me, params, refreshCounts }) {
               {c.state === 'request_out' && <p className="notice">Message request sent. You can keep chatting; they'll see it once they accept.</p>}
 
               <div className="bubbles">
-                {c.messages.length === 0 && c.state !== 'blocked' && (
+                {/* An empty chat: type your own first message, or have AI write
+                    3 from what you two share (classes, topics, free times). */}
+                {c.messages.length === 0 && c.can_send && (
                   <div className="icebreakers">
                     {ai.openers ? (
                       <>
                         <p className="muted">Written by AI from what you two share. Tap one to edit it, then send:</p>
                         {ai.openers.map((t) => (
-                          <button key={t} className="chip" disabled={!c.can_send} onClick={() => pickOpener(t)}>
+                          <button key={t} className="chip" onClick={() => pickOpener(t)}>
                             {t}
                           </button>
                         ))}
                       </>
                     ) : (
-                      <>
-                        <p className="muted">Not sure what to say? Tap one to edit it, then send:</p>
-                        {icebreakers(me, otherProfile).map((t) => (
-                          <button key={t} className="chip" disabled={!c.can_send} onClick={() => pickOpener(t)}>
-                            {t}
-                          </button>
-                        ))}
-                      </>
+                      <p className="muted">Say hi and suggest a time to study, or let AI write a first message from your shared classes and free times.</p>
                     )}
-                    {c.can_send && (
-                      <button type="button" className="link ai-write" disabled={ai.loading} onClick={writeWithAi}>
-                        {ai.openers ? 'Write 3 different ones' : 'Write 3 openers with AI →'}
-                      </button>
-                    )}
+                    {/* Before any suggestions, AI is the one thing to try, so it's a
+                        real button; after, asking again is a quieter link. */}
+                    <button type="button" className={ai.openers ? 'link ai-write' : 'primary small ai-write'} disabled={ai.loading} onClick={writeWithAi}>
+                      {ai.openers ? 'Write 3 different ones' : '✨ Write 3 openers with AI'}
+                    </button>
                     <p className="muted small-text" role="status">
                       {ai.loading ? 'Writing 3 suggestions…' : ai.error}
                     </p>
