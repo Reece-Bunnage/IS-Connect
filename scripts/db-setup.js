@@ -30,10 +30,10 @@ try {
   }
 
   const files = functionsOnly
-    ? ['supabase/functions.sql']
+    ? ['supabase/functions.sql', 'supabase/custom-strengths.sql']
     : upgrade
-      ? ['supabase/upgrade.sql', 'supabase/reference.sql', 'supabase/functions.sql', 'supabase/upgrade-data.sql']
-      : ['supabase/schema.sql', 'supabase/functions.sql', 'supabase/reference.sql', 'supabase/seed.sql']
+      ? ['supabase/upgrade.sql', 'supabase/reference.sql', 'supabase/functions.sql', 'supabase/upgrade-data.sql', 'supabase/custom-strengths.sql']
+      : ['supabase/schema.sql', 'supabase/functions.sql', 'supabase/reference.sql', 'supabase/seed.sql', 'supabase/custom-strengths.sql']
   for (const file of files) {
     await client.query(await readFile(file, 'utf8'))
     console.log(`Ran ${file}`)

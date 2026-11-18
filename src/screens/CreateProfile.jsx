@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { addStrength } from '../strengths.js'
 import { supabase } from '../supabaseClient.js'
 import { rpc, useQuery } from '../api.js'
 import { AVATAR_COLORS, Avatar, COLOR_NAMES, PROGRAMS, arrowKeys } from '../ui.jsx'
@@ -15,6 +16,7 @@ function formFrom(profile) {
     course_ids: profile?.student_courses?.map((c) => c.course_id) ?? [],
     skill_ids: profile?.student_skills?.map((s) => s.skill_id) ?? [],
     need_ids: profile?.student_needs?.map((s) => s.skill_id) ?? [],
+    custom_strengths: [],
   }
 }
 
@@ -30,6 +32,9 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [customStrength, setCustomStrength] = useState('')
+  const [strengthError, setStrengthError] = useState('')
+  const [strengthNotice, setStrengthNotice] = useState('')
 
   const lists = useQuery(async () => {
     const [courses, skills] = await Promise.all([
@@ -45,6 +50,16 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
   const toggle = (field, id) =>
     setForm({ ...form, [field]: form[field].includes(id) ? form[field].filter((x) => x !== id) : [...form[field], id] })
 
+  function stageStrength() {
+    try {
+      const result = addStrength(customStrength, lists.data.skills, form.skill_ids, form.custom_strengths)
+      setForm({ ...form, skill_ids: result.skillIds, custom_strengths: result.customStrengths })
+      setCustomStrength('')
+      setStrengthError('')
+      setStrengthNotice('Strength selected. Save your profile to keep it.')
+    } catch (err) { setStrengthError(err.message); setStrengthNotice('') }
+  }
+
   async function save() {
     if (!form.full_name.trim()) {
       setStep(0)
@@ -54,14 +69,27 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
     setSaving(true)
     setError(null)
     try {
+      let selected = { skillIds: form.skill_ids, customStrengths: form.custom_strengths }
+      // Include an unsubmitted draft too, so Save never silently loses it.
+      if (customStrength.trim()) {
+        selected = addStrength(customStrength, lists.data.skills, selected.skillIds, selected.customStrengths)
+      }
+      const payload = { ...form, skill_ids: selected.skillIds, graduation_year: form.graduation_year || null }
+      delete payload.custom_strengths
       // 1-2. Send the request; save_profile checks your login and saves your row,
       // classes, strengths and needs, and joins your classes' study groups.
-      await rpc('save_profile', { p_profile: { ...form, graduation_year: form.graduation_year || null } })
+      if (selected.customStrengths.length) {
+        await rpc('save_profile_with_strengths', { p_profile: payload, p_custom_strengths: selected.customStrengths })
+      } else {
+        await rpc('save_profile', { p_profile: payload })
+      }
       // 3-4. Re-read the profile from the database and show it.
       await onSaved()
       go(isNew ? 'home' : 'myProfile', {}, { replace: true })
     } catch (err) {
-      setError(err.message)
+      setError(err.message.includes('save_profile_with_strengths')
+        ? 'Custom strengths are not available yet. Ask your team to run custom-strengths.sql in Supabase, then try saving again. Your entries are still here.'
+        : err.message)
       setSaving(false)
     }
   }
@@ -148,19 +176,41 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
   const strengths = (
     <fieldset className="form-section">
       <legend className="section-title">Strengths & needs</legend>
-      <fieldset>
-        <legend>I'm strong in…</legend>
+      <fieldset className="topic-section strength-section" aria-describedby="strengths-example">
+        <legend>I can help others with</legend>
+        <p id="strengths-example" className="muted">Choose topics you feel comfortable explaining. For example: “I can help a classmate build an Excel formula.”</p>
         <div className="chips">
           {skills.map((s) => (
-            <label key={s.id} className={`chip ${form.skill_ids.includes(s.id) ? 'on' : ''}`}>
+            <label key={s.id} className={`chip strength ${form.skill_ids.includes(s.id) ? 'on' : ''}`}>
               <input type="checkbox" checked={form.skill_ids.includes(s.id)} onChange={() => toggle('skill_ids', s.id)} />
               {s.name}
             </label>
           ))}
         </div>
+        {form.custom_strengths.length > 0 && <div className="chips" aria-label="Custom strengths to save">
+          {form.custom_strengths.map(name => <button type="button" key={name} className="chip strength on custom-strength-chip"
+            aria-label={`Remove custom strength ${name}`}
+            onClick={() => setForm({ ...form, custom_strengths: form.custom_strengths.filter(item => item !== name) })}>
+            {name} <span aria-hidden="true">×</span>
+          </button>)}
+        </div>}
+        <div className="custom-strength-entry">
+          <label htmlFor="custom-strength">Add a custom strength</label>
+          <p id="custom-strength-help" className="muted small-text">Missing a topic? Try Tableau, public speaking, or project planning. Up to 40 characters each. Saved topics are visible to other students.</p>
+          <div className="row">
+            <input id="custom-strength" value={customStrength} maxLength={40}
+              placeholder="e.g. Tableau" aria-describedby="custom-strength-help" aria-invalid={Boolean(strengthError)}
+              onChange={e => { setCustomStrength(e.target.value); setStrengthError(''); setStrengthNotice('') }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); stageStrength() } }} />
+            <button type="button" className="secondary small" disabled={saving || !customStrength.trim()} onClick={stageStrength}>+ Add strength</button>
+          </div>
+          {strengthError && <p className="error" role="alert">{strengthError}</p>}
+          <p className="muted small-text" role="status">{strengthNotice}</p>
+        </div>
       </fieldset>
-      <fieldset>
-        <legend>I'd like help with…</legend>
+      <fieldset className="topic-section need-section" aria-describedby="needs-example">
+        <legend>I want help with</legend>
+        <p id="needs-example" className="muted">Choose topics you’re learning or want more practice with. For example: “I want help understanding SQL joins.”</p>
         <div className="chips">
           {skills.map((s) => (
             <label key={s.id} className={`chip need ${form.need_ids.includes(s.id) ? 'on' : ''}`}>
@@ -171,7 +221,7 @@ export default function CreateProfile({ go, profile, onSaved, onboarding }) {
         </div>
       </fieldset>
       <label>
-        Anything specific? (optional)
+        What would you like help understanding? (optional)
         <input value={form.looking_for_help_with} onChange={set('looking_for_help_with')} placeholder="e.g. LEFT vs INNER joins" />
       </label>
       <label>

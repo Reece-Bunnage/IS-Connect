@@ -648,3 +648,18 @@ body:has(.survey-dialog[open]), body:has(.app-dialog[open]), body:has(.sheet[ope
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Clearly separate what a student can offer from what they want to learn. */
+.topic-section { padding: 18px; border: 1px solid var(--border); border-radius: 12px; margin: 8px 0 16px; min-width: 0; }
+.topic-section > legend { padding: 0 6px; font-size: 1.1rem; font-weight: 700; }
+.strength-section { border-top: 4px solid var(--green); background: #f5f9f5; }
+.need-section { border-top: 4px solid #c9893a; background: #fffaf3; }
+.topic-section .chips { margin-top: 12px; }
+.chip.strength { border-style: solid; }
+.custom-strength-entry { margin-top: 20px; }
+.custom-strength-entry .row { align-items: center; margin-top: 8px; }
+.custom-strength-entry input { flex: 1; min-width: 140px; }
+.custom-strength-entry button { margin-top: 0; }
+.custom-strength-chip { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: .85rem; cursor: pointer; overflow-wrap: anywhere; max-width: 100%; }
+.chip:has(input:focus-visible), .custom-strength-chip:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+@media (max-width: 480px) { .topic-section { padding: 12px; } }

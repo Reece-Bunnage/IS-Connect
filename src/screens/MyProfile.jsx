@@ -69,12 +69,12 @@ export default function MyProfile({ go, profile, session, onDeleted }) {
         <dl className="details">
           <dt>Classes</dt>
           <dd>{courses.length ? courses.join(', ') : <span className="muted">None yet</span>}</dd>
-          <dt>Strong in</dt>
+          <dt>I can help others with</dt>
           <dd>
             {skills.length ? (
               <span className="chips inline">
                 {skills.map((n) => (
-                  <span key={n} className="chip on">
+                  <span key={n} className="chip strength on">
                     {n}
                   </span>
                 ))}
@@ -83,7 +83,7 @@ export default function MyProfile({ go, profile, session, onDeleted }) {
               <span className="muted">None yet</span>
             )}
           </dd>
-          <dt>Wants help with</dt>
+          <dt>I want help with</dt>
           <dd>
             {needs.length ? (
               <span className="chips inline">
