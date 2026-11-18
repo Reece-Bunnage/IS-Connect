@@ -323,7 +323,7 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
    (No terminal? Paste [supabase/schema.sql](supabase/schema.sql), [supabase/functions.sql](supabase/functions.sql), [supabase/reference.sql](supabase/reference.sql), then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. `schema.sql` deletes existing data; the others are safe to re-run.)
 
    Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has the 23 tables listed in the ERD above. The course list lives in [supabase/reference.sql](supabase/reference.sql); edit the names to match the catalog and re-run it.
-4. **Make yourself an admin** (optional): sign up in the app, then run `npm run make-admin -- yourusername`. Admins see a **Reports** screen with password reset requests, the OKR numbers, and reports of students and study guides. `--remove` takes it away. If an admin is locked out, `npm run reset-password -- theirusername` prints a 48-hour temporary password (it needs `SUPABASE_DB_URL` in `.env.local`).
+4. **Make yourself an admin** (optional): sign up in the app, then run `npm run make-admin -- yourusername`. Admins see **Reports** and **Maintain Users / Records**. The latter supports full CRUD for accounts and study guides. Newly created users receive a one-time temporary password and must change it at first login.
 5. **Start the app**
    ```bash
    npm run dev

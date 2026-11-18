@@ -20,6 +20,7 @@ import Resources from './screens/Resources.jsx'
 import BlockReport from './screens/BlockReport.jsx'
 import Notifications from './screens/Notifications.jsx'
 import Reports from './screens/Reports.jsx'
+import AdminMaintenance from './screens/AdminMaintenance.jsx'
 
 // Every screen has its own URL, e.g. #/messages?studentId=…, so the browser's
 // Back button and the phone's swipe-back gesture step through the app instead
@@ -190,6 +191,7 @@ export default function App() {
     blockReport: <BlockReport {...props} onSaved={reloadProfile} />,
     notifications: <Notifications {...props} />,
     reports: session?.is_admin ? <Reports {...props} /> : null,
+    admin: session?.is_admin ? <AdminMaintenance {...props} /> : null,
   }
 
   let content
@@ -199,6 +201,7 @@ export default function App() {
     : <Welcome onStart={setAuthMode} />
   // Logged in with an admin's temporary password: choose a new one first.
   else if (mustChangePassword) content = <ChangePassword forced onChanged={setSession} />
+  else if (screen === 'admin' && session?.is_admin) content = screens.admin
   else if (profileError) content = <p className="error">Could not load your profile: {profileError}</p>
   else if (profile === undefined) content = <p className="muted">Loading your profile…</p>
   else if (!profile && screen !== 'createProfile') content = <CreateProfile go={go} profile={null} onSaved={reloadProfile} onboarding />
@@ -206,7 +209,7 @@ export default function App() {
   else content = screens[screen] ?? screens.home
 
   const active = NAV_PARENT[screen] ?? screen
-  const nav = session?.is_admin ? [...NAV, { id: 'reports', icon: 'doc', label: 'Reports (admin)' }] : NAV
+  const nav = session?.is_admin ? [...NAV, { id: 'reports', icon: 'doc', label: 'Reports (admin)' }, { id: 'admin', icon: 'doc', label: 'Maintain Users / Records' }] : NAV
   const notificationCount = counts?.notifications ?? 0
   const hasNav = Boolean(session && profile && !mustChangePassword)
   // An open chat keeps the whole phone screen, like a messaging app: its own

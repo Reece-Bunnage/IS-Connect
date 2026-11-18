@@ -37,7 +37,7 @@ create extension if not exists pgcrypto with schema extensions;  -- password has
 -- ---------------------------------------------------------------------------
 -- Logins (never readable through the API)
 
--- A username + hashed password. After an admin sets a temporary password
+-- A username and hashed password. After an admin sets a temporary password
 -- ("Forgot password?"), the student must choose a new one at their next login.
 create table app_users (
   id                       uuid primary key default gen_random_uuid(),

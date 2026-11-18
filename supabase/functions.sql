@@ -1244,6 +1244,69 @@ end $$;
 -- ===========================================================================
 -- Admin: reports
 
+create or replace function admin_users(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform _require_admin(p_token);
+  return coalesce((select json_agg(json_build_object('id',u.id,'username',u.username,'is_admin',u.is_admin,'created_at',u.created_at,'full_name',s.full_name) order by u.created_at desc) from app_users u left join students s on s.user_id=u.id),'[]'::json);
+end $$;
+
+create or replace function admin_create_user(p_token uuid,p_username text) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_username text:=lower(btrim(coalesce(p_username,''))); v_temp text:=_new_temp_password(); v_id uuid;
+begin
+  perform _require_admin(p_token);
+  if v_username !~ '^[a-z0-9_.]{3,30}$' then raise exception 'Username must be 3-30 letters, numbers, dots or underscores.'; end if;
+  if exists(select 1 from app_users where username=v_username) then raise exception 'That username is already registered.'; end if;
+  insert into app_users(username,password_hash,must_change_password,temp_password_expires_at)
+  values(v_username,crypt(v_temp,gen_salt('bf')),true,now()+interval '48 hours') returning id into v_id;
+  return json_build_object('id',v_id,'username',v_username,'temp_password',v_temp);
+end $$;
+
+create or replace function admin_update_user(p_token uuid,p_user_id uuid,p_username text,p_is_admin boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_admin uuid:=_session_user(p_token); v_username text:=lower(btrim(coalesce(p_username,'')));
+begin
+  perform _require_admin(p_token);
+  if v_username !~ '^[a-z0-9_.]{3,30}$' then raise exception 'Username must be 3-30 letters, numbers, dots or underscores.'; end if;
+  if p_user_id=v_admin and not coalesce(p_is_admin,false) then raise exception 'You cannot remove your own admin access.'; end if;
+  update app_users set username=v_username,is_admin=coalesce(p_is_admin,false) where id=p_user_id;
+  if not found then raise exception 'User not found.'; end if;
+end $$;
+
+create or replace function admin_delete_user(p_token uuid,p_user_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_admin uuid:=_session_user(p_token);
+begin
+  perform _require_admin(p_token);
+  if p_user_id=v_admin then raise exception 'You cannot delete your own account.'; end if;
+  if (select is_admin from app_users where id=p_user_id) and (select count(*) from app_users where is_admin)<2 then raise exception 'The last admin account cannot be deleted.'; end if;
+  delete from app_users where id=p_user_id;
+end $$;
+
+create or replace function admin_resources(p_token uuid) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform _require_admin(p_token);
+  return coalesce((select json_agg(json_build_object('id',r.id,'title',r.title,'course',r.course,'resource_url',r.resource_url,'uploaded_at',r.uploaded_at,'uploader_id',r.uploader_id,'uploader',s.full_name) order by r.uploaded_at desc) from study_resources r left join students s on s.id=r.uploader_id),'[]'::json);
+end $$;
+
+create or replace function admin_save_resource(p_token uuid,p_resource_id bigint,p_title text,p_course text,p_url text) returns bigint
+language plpgsql security definer set search_path = public as $$
+declare v_id bigint;
+begin
+  perform _require_admin(p_token);
+  if length(btrim(coalesce(p_title,''))) not between 1 and 160 then raise exception 'Title is required (up to 160 characters).'; end if;
+  if coalesce(p_url,'') !~ '^https?://' then raise exception 'Enter a valid http or https link.'; end if;
+  if p_resource_id is null then
+    insert into study_resources(uploader_id,title,course,resource_url) values(_session_student(p_token),btrim(p_title),nullif(btrim(p_course),''),btrim(p_url)) returning id into v_id;
+  else
+    update study_resources set title=btrim(p_title),course=nullif(btrim(p_course),''),resource_url=btrim(p_url) where id=p_resource_id returning id into v_id;
+    if v_id is null then raise exception 'Study guide not found.'; end if;
+  end if;
+  return v_id;
+end $$;
+
 create or replace function admin_reports(p_token uuid) returns json
 language plpgsql stable security definer set search_path = public as $$
 begin
