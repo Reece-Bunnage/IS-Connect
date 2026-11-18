@@ -399,6 +399,7 @@ details.more .menu button.danger { color: var(--error); }
 .confirm-box { background: #fff7f6; border: 1px solid #f0c6c1; border-radius: 12px; padding: 12px; margin-top: 8px; }
 .resolved { opacity: 0.6; }
 /* Admin: OKRs, one tile per key result, grouped by objective. */
+.admin-brand-image { display: block; width: min(100%, 800px); height: auto; border-radius: 14px; margin: 0 0 24px; }
 .okr { margin-bottom: 32px; }
 .okr-objective { margin-top: 20px; }
 .okr-objective h3 { font-size: 1rem; }

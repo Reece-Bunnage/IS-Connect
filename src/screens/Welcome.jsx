@@ -12,6 +12,7 @@ export default function Welcome({ onStart }) {
       </div>
       <p className="muted small-text">For Pre-IS students, IS Core students, IS minors, and TAs.</p>
     </section>
+    <img className="welcome-image" src="/welcome-study.svg" alt="Students studying together around a table" />
     <section aria-labelledby="welcome-how">
       <h2 id="welcome-how">A little connection. A lot of possibility.</h2>
       <div className="welcome-grid">

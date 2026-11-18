@@ -193,6 +193,7 @@ export default function Reports({ me }) {
   return (
     <>
       <PageHeader title="Reports" text="Password reset requests, progress on our OKRs, and reports of students and study guides to review." />
+      <img className="admin-brand-image" src="/byu-information-systems.jpeg" alt="BYU Information Systems" />
 
       <PasswordResets me={me} />
 
