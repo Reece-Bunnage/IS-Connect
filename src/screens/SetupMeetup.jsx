@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient.js'
 import { rpc, useHiddenIds, useQuery, useRpc } from '../api.js'
 import { STUDENT_SELECT, scoreStudents } from '../matching.js'
 import { formatHour, formatWhen, freeAt, freeHoursOn, nextSevenDays, toLocalInput } from '../time.js'
-import { Avatar, DemoBadge, Icon, PageHeader, arrowKeys, programLabel, tabProps } from '../ui.jsx'
+import { Avatar, DemoBadge, Icon, PLACES, PageHeader, arrowKeys, programLabel, tabProps } from '../ui.jsx'
 
 const DURATIONS = [
   [30, '30 minutes'],
@@ -11,7 +11,6 @@ const DURATIONS = [
   [90, '1.5 hours'],
   [120, '2 hours'],
 ]
-const PLACES = ['Library, 2nd floor study room', 'Business building commons', 'Student center', 'Online (Zoom)']
 const STEPS = [
   ['when', 'When'],
   ['who', 'Who'],

@@ -188,10 +188,14 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .messages-layout .chat { display: none; }
 .messages-layout.has-chat .convo-list { display: none; }
 .messages-layout.has-chat .chat { display: flex; }
+/* Messages: the chat with its meetups box below, 12px apart (Groups has no box). */
+.messages-layout .chat-column { display: none; flex-direction: column; gap: 12px; min-width: 0; }
+.messages-layout.has-chat .chat-column { display: flex; }
+.chat-column .chat { flex: 1; }
 @media (min-width: 900px) {
   .messages-layout { grid-template-columns: 260px minmax(0, 1fr); align-items: stretch; }
   .messages-layout .convo-list, .messages-layout.has-chat .convo-list { display: block; }
-  .messages-layout .chat { display: flex; }
+  .messages-layout .chat, .messages-layout .chat-column { display: flex; }
   .back-to-list { display: none; }
 }
 .convo-list { margin: 0; }
@@ -223,6 +227,22 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--t
 .send-row { display: flex; gap: 8px; }
 .send-row input { flex: 1; }
 .send-row button { margin-top: 0; }
+
+/* Meetups with this person, below the conversation (ChatMeetups in Messages.jsx). */
+.chat-meetups { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.chat-meetups-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chat-meetups-head h3 { margin: 0; font-size: 0.95rem; }
+.chat-meetups-head .link { padding: 4px 0; }
+.chat-meetup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.chat-meetup > .icon { flex: none; color: var(--green); }
+.chat-meetup-text { flex: 1; min-width: 180px; }
+.chat-meetup-text p { margin: 0; }
+.chat-meetups .small, .chat-meetups .row { margin-top: 0; }
+.chat-free-label { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--green); font-weight: 600; font-size: 0.9rem; }
+.chat-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
+.chat-invite label { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; font-size: 0.9rem; font-weight: 600; }
+.chat-invite select { min-width: 0; }
+.chat-invite p { flex-basis: 100%; margin: 0; }
 
 /* ---- Meetups / resources / safety ---- */
 .details { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 16px 0; }
@@ -349,6 +369,9 @@ details.more .menu button.danger { color: var(--error); }
 .convo-list .segmented { margin-top: 0; }
 .icebreakers { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .icebreakers .chip { text-align: left; }
+.icebreakers .link.ai-write { padding: 6px 0 0; font-size: 0.9rem; }
+.icebreakers .primary.ai-write { margin-top: 4px; }
+.icebreakers .ai-write:disabled { opacity: 0.6; cursor: wait; }
 .request-banner .row { margin-top: 6px; }
 .group-icon { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: var(--green-soft); color: var(--green); }
 .group-icon.match { background: #ece9f7; color: #4b3b8f; }
@@ -375,6 +398,17 @@ details.more .menu button.danger { color: var(--error); }
 .radio-card input { margin-top: 4px; }
 .confirm-box { background: #fff7f6; border: 1px solid #f0c6c1; border-radius: 12px; padding: 12px; margin-top: 8px; }
 .resolved { opacity: 0.6; }
+/* Admin: OKRs, one tile per key result, grouped by objective. */
+.admin-brand-image { display: block; width: min(100%, 800px); height: auto; border-radius: 14px; margin: 0 0 24px; }
+.okr { margin-bottom: 32px; }
+.okr-objective { margin-top: 20px; }
+.okr-objective h3 { font-size: 1rem; }
+.okr-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 12px; margin: 12px 0 0; }
+.okr-tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.okr-tile dt { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.okr-tile dd { margin: 0; }
+.okr-tile .okr-value { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-top: 6px; }
+.okr-tile .okr-detail { font-size: 0.85rem; color: var(--muted); }
 
 /* ---- Availability: "Weekly hours" (a row per day with From / To times) ---- */
 .availability-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }

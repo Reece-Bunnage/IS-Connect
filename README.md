@@ -16,6 +16,7 @@ GitHub draws this diagram from [docs/erd.mmd](docs/erd.mmd). [docs/erd.dbml](doc
 erDiagram
     app_users ||--o| students : "1-to-0..1: owns profile"
     app_users ||--o{ app_sessions : "1-to-many: logged-in browsers"
+    app_users ||--o{ password_reset_requests : "1-to-many: asks an admin for a reset"
     students ||--o{ student_skills : "M:N with skills: strong in"
     skills ||--o{ student_skills : "M:N with students"
     students ||--o{ student_needs : "M:N with skills: needs help with"
@@ -44,6 +45,7 @@ erDiagram
     study_groups ||--o{ group_messages : "1-to-many: contains"
     students ||--o{ group_messages : "1-to-many: posts"
     students ||--o{ study_queue : "1-to-many: waits for a match"
+    students ||--o{ student_visits : "1-to-many: opened the app on (retention)"
     courses ||--o{ study_queue : "1-to-many: match on class"
     skills ||--o{ study_queue : "1-to-many: match on topic"
     study_groups ||--o{ study_queue : "1-to-many: matched into"
@@ -52,7 +54,8 @@ erDiagram
         uuid id PK
         text username UK
         text password_hash "bcrypt"
-        text recovery_hash "bcrypt, one-time code"
+        boolean must_change_password "after an admin's temporary password"
+        timestamptz temp_password_expires_at "48 hours"
         boolean is_admin
         timestamptz created_at
     }
@@ -60,6 +63,20 @@ erDiagram
         uuid token PK
         uuid user_id FK
         timestamptz created_at
+    }
+    password_reset_requests {
+        bigint id PK
+        uuid user_id FK
+        text contact "how an admin can reach them"
+        text note
+        timestamptz created_at
+        timestamptz handled_at
+        uuid handled_by FK "the admin"
+        text outcome "temporary_password or dismissed"
+    }
+    student_visits {
+        uuid student_id PK, FK
+        date day PK
     }
     students {
         uuid id PK
@@ -227,7 +244,9 @@ erDiagram
 
 | Entity | What it stores |
 |---|---|
-| `app_users`, `app_sessions` | Logins (username, bcrypt-hashed password and recovery code, admin flag) and logged-in browsers |
+| `app_users`, `app_sessions` | Logins (username, bcrypt-hashed password, admin flag, "must choose a new password" after a temporary one) and logged-in browsers |
+| `password_reset_requests` | "Forgot password?" requests for an admin: who, how to reach them, and how it was handled |
+| `student_visits` | One row per student per day they opened the app, for retention numbers |
 | `students` | A profile: name, avatar color, program, graduation year, bio, "ask me about", who can contact them, last active |
 | `skills`, `courses` | The lists of IS topics and IS classes |
 | `student_skills`, `student_needs`, `student_courses` | Join tables: a student's strengths, the topics they need help with, and their classes |
@@ -259,6 +278,7 @@ erDiagram
 | Backend / API | [Supabase](https://supabase.com), backend as a service. It generates a REST API from our tables, and we call it with the `@supabase/supabase-js` client. |
 | Database | PostgreSQL, hosted by Supabase, with Row Level Security policies |
 | Calendar link | A Supabase Edge Function ([supabase/functions/calendar](supabase/functions/calendar)) that turns a student's meetups into a calendar file for Google Calendar to subscribe to |
+| AI first messages | A Supabase Edge Function ([supabase/functions/ai-openers](supabase/functions/ai-openers)) that asks Google's Gemini API (free tier) for 3 first messages built from what two students share: hard topics, classes and free times. Students tap one to edit it before sending; nothing is sent for them. |
 | Secrets | The Supabase URL and publishable key live in `.env.local`, which is listed in `.gitignore` |
 
 **Why this fits our team:** Supabase's free tier gives us a real PostgreSQL database without running or hosting our own server. Every teammate can see the tables and rows in the Supabase dashboard, and we can still write the schema ourselves in SQL ([supabase/schema.sql](supabase/schema.sql)). The whole team shares one project, so our setups can't drift apart. React + Vite is a small, fast setup that works well on phones, which matters because our persona would mostly use IS-Connect on their phone.
@@ -303,7 +323,7 @@ To run it on your own computer, you need [Node.js](https://nodejs.org) 22 or new
    (No terminal? Paste [supabase/schema.sql](supabase/schema.sql), [supabase/functions.sql](supabase/functions.sql), [supabase/reference.sql](supabase/reference.sql), then [supabase/seed.sql](supabase/seed.sql) into **SQL Editor → New query** and click **Run** for each. `schema.sql` deletes existing data; the others are safe to re-run.)
 
    Not sure what's in your database? Look at **Table Editor** in Supabase. A complete setup has the 23 tables listed in the ERD above. The course list lives in [supabase/reference.sql](supabase/reference.sql); edit the names to match the catalog and re-run it.
-4. **Make yourself an admin** (optional): sign up in the app, then run `npm run make-admin -- yourusername`. Admins see a **Reports** screen with reports of students and study guides. `--remove` takes it away.
+4. **Make yourself an admin** (optional): sign up in the app, then run `npm run make-admin -- yourusername`. Admins see **Reports** and **Maintain Users / Records**. The latter supports full CRUD for accounts and study guides. Newly created users receive a one-time temporary password and must change it at first login.
 5. **Start the app**
    ```bash
    npm run dev
@@ -332,6 +352,17 @@ Every push to `main` rebuilds the live site through [.github/workflows/deploy.ym
    Keep it **only** in `.env.local`, never in GitHub or a chat. When it expires, make a new one the next time you need to deploy.
 2. Run `npm run deploy:calendar`. Docker isn't needed. It prints the address calendar links are served from.
 
+**AI first messages (Edge Function).** Also on Supabase, and only needs redeploying when [supabase/functions/ai-openers](supabase/functions/ai-openers) changes. Uses the same access token as above, plus a Gemini key:
+
+1. Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) and add it to `.env.local`:
+   ```
+   GEMINI_API_KEY=<your key>
+   ```
+   No `VITE_` prefix: `VITE_` values are built into the public website, where anyone could copy the key.
+2. Run `npm run deploy:ai`. It saves the key as an Edge Function secret on Supabase and deploys the function. If your access token isn't allowed to save secrets, add `GEMINI_API_KEY` by hand under **Edge Functions → Secrets** in Supabase.
+
+The free tier has per-minute and per-day limits and is sometimes busy; the function then tries a backup model, and if that's busy too, the app says to try again in a minute. Google may use what's sent on the free tier to improve its products, so the function sends only first names and profile details every student can already see.
+
 If [supabase/functions.sql](supabase/functions.sql) or the database changed too, run `npm run db:functions` or `npm run db:upgrade` first, as above.
 
 ## Verifying the Vertical Slice
@@ -342,7 +373,7 @@ If [supabase/functions.sql](supabase/functions.sql) or the database changed too,
 
 Try this walkthrough on the live site:
 
-1. **Sign up.** Click **New here? Sign up**, pick a username and password, and save the **recovery code** it shows you.
+1. **Sign up.** Click **New here? Sign up** and pick a username and password.
 2. **Set up your profile.** The 3 steps ask about you (avatar color, program, graduation year, bio), your classes (pick **IS 201** and one more), and your strengths and needs (need **SQL**). Home shows your **Profile strength** and what's missing.
 3. **Set your free times.** In **Availability**, pick **Mon** and tap **4:00 PM**, then **Save & find a partner →**.
 4. **Find a partner.** **Find Friends** sorts by **Best match** and explains each one, e.g. "In IS 201 with you · Strong in SQL, which you need · Free together Mon 4:00 PM". Try the search box and filters.
@@ -355,4 +386,5 @@ Try this walkthrough on the live site:
 10. **Notifications.** Actions involving you (friend requests, accepted requests, matches, meetup invites) show on the bell 🔔. A confirmed meetup in the next 24 hours shows as a reminder.
 11. **Study guides.** Share one for IS 201, **☆ Save** someone else's, and filter by **Saved** or **My classes**. **Report** sends it to the admins.
 12. **Block someone.** In **Safety & Privacy**, block Emma, confirm, then **Undo** from the message at the bottom of the screen.
-13. **Refresh, log out, log back in.** Everything is still there. **Forgot password?** on the login screen works with your recovery code.
+13. **Refresh, log out, log back in.** Everything is still there. To change your password, use **My Profile → Change password**.
+14. **Forgot password?** On the login screen, enter your username and how an admin can reach you. Admins see the request (and a 🔔 notification) at the top of **Reports**, contact you to check it's you, and click **Set temporary password**. Log in with it within 48 hours and you'll be asked to choose a new password.

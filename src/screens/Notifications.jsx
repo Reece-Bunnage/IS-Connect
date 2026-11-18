@@ -12,6 +12,7 @@ const ICONS = {
   meetup_confirmed: '✅',
   meetup_cancelled: '❌',
   meetup_new_time: '🕒',
+  password_reset: '🔑',
   meetup_reminder: '⏰',
   match_found: '✨',
 }

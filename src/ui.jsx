@@ -84,6 +84,9 @@ export function Icon({ name, size = 18 }) {
 // Which nav item to highlight for screens that aren't in the nav.
 export const NAV_PARENT = { createProfile: 'myProfile', setupMeetup: 'meetups' }
 
+// Where students can meet (the meetup form and the chat's quick invite).
+export const PLACES = ['Library, 2nd floor study room', 'Business building commons', 'Student center', 'Online (Zoom)']
+
 // Badge number for a nav item, from my_state's counts.
 export function badgeCount(item, counts) {
   if (!item.badge || !counts) return 0
